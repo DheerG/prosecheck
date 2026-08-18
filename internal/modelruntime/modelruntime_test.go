@@ -50,8 +50,24 @@ func TestDefaultPathsUsesProsecheckHome(t *testing.T) {
 	if paths.Root != root {
 		t.Fatalf("expected root %q, got %q", root, paths.Root)
 	}
-	if paths.Model != filepath.Join(root, "models", ModelName, ModelFileName) {
+	expectedModel, expectedBlob, _ := huggingFaceModelPaths(filepath.Join(root, "huggingface", "hub"))
+	if paths.Model != expectedModel || paths.ModelBlob != expectedBlob {
 		t.Fatalf("unexpected model path %q", paths.Model)
+	}
+}
+
+func TestDefaultPathsUsesHuggingFaceCache(t *testing.T) {
+	t.Setenv("PROSECHECK_HOME", "")
+	hubRoot := t.TempDir()
+	t.Setenv("HF_HUB_CACHE", hubRoot)
+
+	paths, err := DefaultPaths()
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedModel, expectedBlob, expectedRef := huggingFaceModelPaths(hubRoot)
+	if paths.Model != expectedModel || paths.ModelBlob != expectedBlob || paths.ModelRef != expectedRef {
+		t.Fatalf("unexpected Hugging Face paths: %#v", paths)
 	}
 }
 
@@ -115,7 +131,8 @@ func TestDownloadUsesItsOwnHTTPClient(t *testing.T) {
 		Paths: PathsForRoot(t.TempDir()), HTTPClient: healthClient, DownloadClient: downloadClient,
 	})
 	destination := filepath.Join(t.TempDir(), "model.gguf")
-	if err := manager.downloadVerified(context.Background(), "https://model.test/model.gguf", destination, hex.EncodeToString(hash[:])); err != nil {
+	if err := manager.downloadVerified(context.Background(), "https://model.test/model.gguf", destination,
+		hex.EncodeToString(hash[:]), "Downloading the model", nil); err != nil {
 		t.Fatal(err)
 	}
 	written, err := os.ReadFile(destination)
@@ -127,7 +144,7 @@ func TestDownloadUsesItsOwnHTTPClient(t *testing.T) {
 	}
 }
 
-func TestDownloadRemovesPartialFileAfterInterruption(t *testing.T) {
+func TestDownloadKeepsPartialFileAfterInterruption(t *testing.T) {
 	downloadClient := &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
 		return &http.Response{
 			StatusCode: http.StatusOK,
@@ -139,15 +156,57 @@ func TestDownloadRemovesPartialFileAfterInterruption(t *testing.T) {
 		Paths: PathsForRoot(t.TempDir()), DownloadClient: downloadClient,
 	})
 	destination := filepath.Join(t.TempDir(), "model.gguf")
-	err := manager.downloadVerified(context.Background(), "https://model.test/model.gguf", destination, "unused")
+	err := manager.downloadVerified(context.Background(), "https://model.test/model.gguf", destination,
+		"unused", "Downloading the model", nil)
 	if err == nil {
 		t.Fatal("expected the interrupted download to fail")
 	}
-	if _, statErr := os.Stat(destination + ".partial"); !errors.Is(statErr, os.ErrNotExist) {
-		t.Fatalf("expected the partial file to be removed, got %v", statErr)
+	partial, readErr := os.ReadFile(destination + ".partial")
+	if readErr != nil {
+		t.Fatalf("expected the partial file to remain: %v", readErr)
+	}
+	if string(partial) != "partial data" {
+		t.Fatalf("unexpected partial data: %q", partial)
 	}
 	if _, statErr := os.Stat(destination); !errors.Is(statErr, os.ErrNotExist) {
 		t.Fatalf("expected no destination file, got %v", statErr)
+	}
+}
+
+func TestDownloadResumesPartialFile(t *testing.T) {
+	content := []byte("complete model")
+	existing := []byte("complete ")
+	hash := sha256.Sum256(content)
+	downloadClient := &http.Client{Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
+		if request.Header.Get("Range") != "bytes=9-" {
+			t.Fatalf("unexpected range: %q", request.Header.Get("Range"))
+		}
+		return &http.Response{
+			StatusCode: http.StatusPartialContent,
+			Body:       io.NopCloser(bytes.NewReader([]byte("model"))),
+			Header: http.Header{
+				"Content-Range": []string{"bytes 9-13/14"},
+			},
+			ContentLength: 5,
+		}, nil
+	})}
+	manager := NewWithOptions(Options{
+		Paths: PathsForRoot(t.TempDir()), DownloadClient: downloadClient,
+	})
+	destination := filepath.Join(t.TempDir(), "model.gguf")
+	if err := os.WriteFile(destination+".partial", existing, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := manager.downloadVerified(context.Background(), "https://model.test/model.gguf", destination,
+		hex.EncodeToString(hash[:]), "Downloading the model", nil); err != nil {
+		t.Fatal(err)
+	}
+	written, err := os.ReadFile(destination)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(written, content) {
+		t.Fatalf("unexpected resumed data: %q", written)
 	}
 }
 

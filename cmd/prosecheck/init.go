@@ -126,9 +126,12 @@ func runInit(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		cancel()
 		if !installed {
 			fmt.Fprintln(stdout, "Installing the private AI reviewer.")
-			if installErr := manager.Install(context.Background(), "", func(message string) {
-				fmt.Fprintln(stdout, message)
-			}); installErr != nil {
+			installContext, cancelInstall := modelInstallContext()
+			progress := newInstallProgressWriter(stdout)
+			installErr := manager.Install(installContext, "", progress.Report)
+			progress.Finish()
+			cancelInstall()
+			if installErr != nil {
 				fmt.Fprintf(stderr, "Cannot install the local model: %v\n", installErr)
 				return 2
 			}

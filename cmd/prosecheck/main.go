@@ -348,9 +348,12 @@ func runModelInstall(manager *modelruntime.Manager, args []string, stdout, stder
 		fmt.Fprintf(stderr, "The supported model is %s.\n", modelruntime.ModelName)
 		return 2
 	}
-	if err := manager.Install(context.Background(), *modelFile, func(message string) {
-		fmt.Fprintln(stdout, message)
-	}); err != nil {
+	installContext, cancelInstall := modelInstallContext()
+	defer cancelInstall()
+	progress := newInstallProgressWriter(stdout)
+	defer progress.Finish()
+	if err := manager.Install(installContext, *modelFile, progress.Report); err != nil {
+		progress.Finish()
 		fmt.Fprintf(stderr, "Cannot install the model: %v\n", err)
 		return 2
 	}
@@ -387,6 +390,7 @@ func runModelStatus(manager *modelruntime.Manager, args []string, stdout, stderr
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	status := manager.Status(ctx)
+	fmt.Fprintf(stdout, "Model file: %s\n", status.ModelPath)
 	if !status.Installed {
 		fmt.Fprintln(stdout, "Ministral is not installed.")
 		fmt.Fprintf(stdout, "Run `prosecheck model install %s`.\n", modelruntime.ModelName)

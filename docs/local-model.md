@@ -15,7 +15,11 @@ The command downloads these pinned files:
 - The `Ministral-3-8B-Instruct-2512-Q4_K_M.gguf` model from [Mistral AI](https://huggingface.co/mistralai/Ministral-3-8B-Instruct-2512-GGUF)
 - A compatible server from the [Prism llama.cpp release](https://github.com/PrismML-Eng/llama.cpp/releases/tag/prism-b9599-9ca265a)
 
-The model file is 5.20 GB. Prosecheck checks each file before it installs the file.
+The model file is 5.20 GB. Prosecheck shows the downloaded size, percentage, and transfer speed.
+
+If a download stops, run the install command again. Prosecheck keeps the partial file and resumes the download.
+
+Prosecheck checks each file before it installs the file.
 
 If you already have the exact model file, import it instead:
 
@@ -71,15 +75,25 @@ prosecheck model stop
 
 ## Storage
 
-Prosecheck stores the model, server, state, and logs in the operating system's user data directory.
+By default, Prosecheck stores the model in the standard Hugging Face cache:
 
-Set `PROSECHECK_HOME` if you need a different location:
+```text
+~/.cache/huggingface/hub/
+```
+
+Other Hugging Face-compatible tools can reuse this model file. Prosecheck stores its server, state, and logs in the operating system's user data directory.
+
+Set `HF_HOME` or `HF_HUB_CACHE` to select a different shared model cache.
+
+Set `PROSECHECK_HOME` to keep all Prosecheck data in one location:
 
 ```sh
 PROSECHECK_HOME=/path/to/data prosecheck model status
 ```
 
-Do not point this variable at a repository. The model file is too large for Git.
+When you set `PROSECHECK_HOME`, Prosecheck stores the model below that location instead of the shared cache.
+
+Do not point these variables at a repository. The model file is too large for Git.
 
 ## Use another local server
 

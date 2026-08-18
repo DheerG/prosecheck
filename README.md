@@ -213,7 +213,9 @@ The guided setup can install the model. You can also install it directly:
 prosecheck model install ministral-3-8b
 ```
 
-This command downloads a pinned local runtime and a 5.20 GB model file. It verifies both files before installation.
+This command downloads a pinned local runtime and a 5.20 GB model file. It shows the download progress and verifies both files.
+
+The model uses the standard Hugging Face cache. Other compatible local tools can reuse the same file.
 
 Enable the reviewer in `.prosecheck.json`:
 

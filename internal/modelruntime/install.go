@@ -17,11 +17,20 @@ import (
 	"time"
 )
 
-type InstallProgress func(message string)
+type InstallProgress struct {
+	Message        string
+	Downloaded     int64
+	Total          int64
+	BytesPerSecond float64
+	Transfer       bool
+	Done           bool
+}
 
-func (m *Manager) Install(ctx context.Context, modelFile string, progress InstallProgress) error {
-	if progress == nil {
-		progress = func(string) {}
+type InstallReporter func(InstallProgress)
+
+func (m *Manager) Install(ctx context.Context, modelFile string, report InstallReporter) error {
+	if report == nil {
+		report = func(InstallProgress) {}
 	}
 	if err := os.MkdirAll(m.paths.Root, 0o700); err != nil {
 		return err
@@ -38,8 +47,7 @@ func (m *Manager) Install(ctx context.Context, modelFile string, progress Instal
 	}
 	server, serverErr := findServer(m.paths.Runtime, asset.ServerExe)
 	if serverErr != nil {
-		progress("Downloading the local model runtime...")
-		if err := m.installRuntime(ctx, asset); err != nil {
+		if err := m.installRuntime(ctx, asset, report); err != nil {
 			return err
 		}
 		server, serverErr = findServer(m.paths.Runtime, asset.ServerExe)
@@ -50,27 +58,71 @@ func (m *Manager) Install(ctx context.Context, modelFile string, progress Instal
 	_ = server
 
 	if validFile(m.paths.Model, ModelSHA256) {
-		progress("The Ministral model is already installed.")
+		if err := m.writeModelRef(); err != nil {
+			return fmt.Errorf("cannot update the Hugging Face cache: %w", err)
+		}
+		report(InstallProgress{Message: "The Ministral model is already installed."})
+		return nil
+	}
+	if validFile(m.paths.ModelBlob, ModelSHA256) {
+		if err := m.linkModelSnapshot(); err != nil {
+			return fmt.Errorf("cannot add the model to the Hugging Face cache: %w", err)
+		}
+		report(InstallProgress{Message: "The Ministral model is already installed."})
 		return nil
 	}
 	if modelFile != "" {
-		progress("Importing the Ministral model...")
-		if err := copyVerified(modelFile, m.paths.Model, ModelSHA256); err != nil {
+		report(InstallProgress{Message: "Importing the Ministral model..."})
+		if err := copyVerified(modelFile, m.paths.ModelBlob, ModelSHA256); err != nil {
 			return fmt.Errorf("cannot import the Ministral model: %w", err)
 		}
 	} else {
-		progress("Downloading the Ministral model (5.20 GB)...")
-		if err := m.downloadVerified(ctx, modelDownloadURL, m.paths.Model, ModelSHA256); err != nil {
+		if err := m.downloadVerified(ctx, modelDownloadURL, m.paths.ModelBlob, ModelSHA256,
+			"Downloading the Ministral model", report); err != nil {
 			return fmt.Errorf("cannot download the Ministral model: %w", err)
 		}
 	}
-	progress("Installed Ministral 3 8B and the local model runtime.")
+	if err := m.linkModelSnapshot(); err != nil {
+		return fmt.Errorf("cannot add the model to the Hugging Face cache: %w", err)
+	}
+	report(InstallProgress{Message: "Installed Ministral 3 8B and the local model runtime."})
+	report(InstallProgress{Message: "Shared model file: " + m.paths.Model})
 	return nil
 }
 
-func (m *Manager) installRuntime(ctx context.Context, asset runtimeAsset) error {
+func (m *Manager) linkModelSnapshot() error {
+	if validFile(m.paths.Model, ModelSHA256) {
+		return m.writeModelRef()
+	}
+	if err := os.MkdirAll(filepath.Dir(m.paths.Model), 0o700); err != nil {
+		return err
+	}
+	if err := os.Remove(m.paths.Model); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	relativeBlob, err := filepath.Rel(filepath.Dir(m.paths.Model), m.paths.ModelBlob)
+	if err != nil {
+		return err
+	}
+	if err := os.Symlink(relativeBlob, m.paths.Model); err != nil {
+		if linkErr := os.Link(m.paths.ModelBlob, m.paths.Model); linkErr != nil {
+			return errors.Join(err, linkErr)
+		}
+	}
+	return m.writeModelRef()
+}
+
+func (m *Manager) writeModelRef() error {
+	if err := os.MkdirAll(filepath.Dir(m.paths.ModelRef), 0o700); err != nil {
+		return err
+	}
+	return os.WriteFile(m.paths.ModelRef, []byte(ModelRevision), 0o600)
+}
+
+func (m *Manager) installRuntime(ctx context.Context, asset runtimeAsset, report InstallReporter) error {
 	archivePath := filepath.Join(m.paths.Root, "downloads", "prism-runtime."+strings.ReplaceAll(asset.Archive, ".", "-"))
-	if err := m.downloadVerified(ctx, asset.URL, archivePath, asset.SHA256); err != nil {
+	if err := m.downloadVerified(ctx, asset.URL, archivePath, asset.SHA256,
+		"Downloading the local model runtime", report); err != nil {
 		return fmt.Errorf("cannot download the local model runtime: %w", err)
 	}
 	stage := m.paths.Runtime + ".partial"
@@ -102,39 +154,87 @@ func (m *Manager) installRuntime(ctx context.Context, asset runtimeAsset) error 
 	return nil
 }
 
-func (m *Manager) downloadVerified(ctx context.Context, sourceURL, destination, checksum string) error {
+func (m *Manager) downloadVerified(
+	ctx context.Context,
+	sourceURL, destination, checksum, message string,
+	report InstallReporter,
+) error {
 	if validFile(destination, checksum) {
 		return nil
 	}
+	partial := destination + ".partial"
+	offset := fileSize(partial)
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, sourceURL, nil)
 	if err != nil {
 		return err
+	}
+	if offset > 0 {
+		request.Header.Set("Range", fmt.Sprintf("bytes=%d-", offset))
 	}
 	response, err := m.downloadHTTP.Do(request)
 	if err != nil {
 		return err
 	}
 	defer response.Body.Close()
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
+	appendDownload := false
+	total := response.ContentLength
+	if offset > 0 && response.StatusCode == http.StatusPartialContent {
+		start, completeSize, ok := parseContentRange(response.Header.Get("Content-Range"))
+		if !ok || start != offset {
+			return errors.New("the download server returned an invalid content range")
+		}
+		appendDownload = true
+		total = completeSize
+	} else if offset > 0 && response.StatusCode == http.StatusRequestedRangeNotSatisfiable {
+		if !validFile(partial, checksum) {
+			return errors.New("the download server rejected the saved partial file")
+		}
+		if report != nil {
+			report(InstallProgress{
+				Message: message, Downloaded: offset, Total: offset, Transfer: true, Done: true,
+			})
+		}
+		return os.Rename(partial, destination)
+	} else if response.StatusCode == http.StatusOK {
+		offset = 0
+	} else if response.StatusCode < 200 || response.StatusCode >= 300 {
 		return fmt.Errorf("the download server returned HTTP %d", response.StatusCode)
+	} else {
+		return fmt.Errorf("the download server did not resume at byte %d", offset)
 	}
 	if err := os.MkdirAll(filepath.Dir(destination), 0o700); err != nil {
 		return err
 	}
-	partial := destination + ".partial"
-	file, err := os.OpenFile(partial, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
+	flags := os.O_CREATE | os.O_TRUNC | os.O_WRONLY
+	if appendDownload {
+		flags = os.O_CREATE | os.O_APPEND | os.O_WRONLY
+	}
+	file, err := os.OpenFile(partial, flags, 0o600)
 	if err != nil {
 		return err
 	}
 	hash := sha256.New()
-	_, copyErr := io.Copy(io.MultiWriter(file, hash), response.Body)
+	if appendDownload {
+		existing, openErr := os.Open(partial)
+		if openErr != nil {
+			_ = file.Close()
+			return openErr
+		}
+		_, hashErr := io.Copy(hash, existing)
+		closeExistingErr := existing.Close()
+		if hashErr != nil || closeExistingErr != nil {
+			_ = file.Close()
+			return errors.Join(hashErr, closeExistingErr)
+		}
+	}
+	reader := newTransferReader(response.Body, offset, total, message, report)
+	_, copyErr := io.Copy(io.MultiWriter(file, hash), reader)
+	reader.finish()
 	closeErr := file.Close()
 	if copyErr != nil {
-		_ = os.Remove(partial)
 		return copyErr
 	}
 	if closeErr != nil {
-		_ = os.Remove(partial)
 		return closeErr
 	}
 	actual := hex.EncodeToString(hash.Sum(nil))
@@ -143,6 +243,78 @@ func (m *Manager) downloadVerified(ctx context.Context, sourceURL, destination, 
 		return fmt.Errorf("checksum mismatch: expected %s, got %s", checksum, actual)
 	}
 	return os.Rename(partial, destination)
+}
+
+func fileSize(path string) int64 {
+	info, err := os.Stat(path)
+	if err != nil || info.IsDir() {
+		return 0
+	}
+	return info.Size()
+}
+
+func parseContentRange(value string) (int64, int64, bool) {
+	var start, end, total int64
+	count, err := fmt.Sscanf(value, "bytes %d-%d/%d", &start, &end, &total)
+	return start, total, err == nil && count == 3 && start >= 0 && end >= start && total > end
+}
+
+type transferReader struct {
+	reader         io.Reader
+	total          int64
+	message        string
+	report         InstallReporter
+	downloaded     int64
+	lastBytes      int64
+	lastReport     time.Time
+	lastReportDone bool
+}
+
+func newTransferReader(reader io.Reader, downloaded, total int64, message string, report InstallReporter) *transferReader {
+	now := time.Now()
+	transfer := &transferReader{
+		reader: reader, total: total, message: message, report: report,
+		downloaded: downloaded, lastBytes: downloaded, lastReport: now,
+	}
+	if report != nil {
+		report(InstallProgress{Message: message, Downloaded: downloaded, Total: total, Transfer: true})
+	}
+	return transfer
+}
+
+func (reader *transferReader) Read(buffer []byte) (int, error) {
+	count, err := reader.reader.Read(buffer)
+	reader.downloaded += int64(count)
+	now := time.Now()
+	done := errors.Is(err, io.EOF) || (reader.total > 0 && reader.downloaded >= reader.total)
+	if done || now.Sub(reader.lastReport) >= 500*time.Millisecond {
+		reader.send(now, done)
+	}
+	return count, err
+}
+
+func (reader *transferReader) finish() {
+	if !reader.lastReportDone {
+		reader.send(time.Now(), true)
+	}
+}
+
+func (reader *transferReader) send(now time.Time, done bool) {
+	if reader.report == nil || reader.lastReportDone {
+		return
+	}
+	elapsed := now.Sub(reader.lastReport).Seconds()
+	speed := float64(0)
+	if elapsed > 0 {
+		speed = float64(reader.downloaded-reader.lastBytes) / elapsed
+	}
+	reader.report(InstallProgress{
+		Message: reader.message, Downloaded: reader.downloaded, Total: reader.total,
+		BytesPerSecond: speed, Transfer: true, Done: done,
+	})
+	reader.lastBytes = reader.downloaded
+	reader.lastReport = now
+	reader.lastReportDone = done
 }
 
 func copyVerified(source, destination, checksum string) error {

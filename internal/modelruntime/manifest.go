@@ -11,10 +11,11 @@ const (
 	ModelSHA256      = "33e7a72cf5e6e2cfc2f2847075acc013d68bba023e35310cef86b5cf8fdca761"
 	ModelSize        = int64(5198911904)
 	ModelRevision    = "0102285ad796bd99af90f58de616092e5630e970"
+	ModelRepository  = "mistralai/Ministral-3-8B-Instruct-2512-GGUF"
 	RuntimeVersion   = "prism-b9599-9ca265a"
 	DefaultPort      = 11435
 	defaultContext   = 8192
-	modelDownloadURL = "https://huggingface.co/mistralai/Ministral-3-8B-Instruct-2512-GGUF/resolve/" + ModelRevision + "/" + ModelFileName + "?download=true"
+	modelDownloadURL = "https://huggingface.co/" + ModelRepository + "/resolve/" + ModelRevision + "/" + ModelFileName + "?download=true"
 )
 
 type runtimeAsset struct {
