@@ -39,6 +39,7 @@ type Report struct {
 	Model                  string                `json:"model"`
 	SuiteVersion           int                   `json:"suiteVersion"`
 	CaseCount              int                   `json:"caseCount"`
+	Repetitions            int                   `json:"repetitions"`
 	RequestCount           int                   `json:"requestCount"`
 	TruePositives          int                   `json:"truePositives"`
 	FalsePositives         int                   `json:"falsePositives"`
@@ -51,6 +52,8 @@ type Report struct {
 	Recall                 float64               `json:"recall"`
 	F1                     float64               `json:"f1"`
 	ExactMatchRate         float64               `json:"exactMatchRate"`
+	ConsistentCases        int                   `json:"consistentCases"`
+	ConsistencyRate        float64               `json:"consistencyRate"`
 	ClearFalsePositiveRate float64               `json:"clearFalsePositiveRate"`
 	MeanLatencyMS          float64               `json:"meanLatencyMs"`
 	P50LatencyMS           float64               `json:"p50LatencyMs"`
@@ -125,7 +128,7 @@ func Run(ctx context.Context, suite Suite, reviewer Reviewer, options Options) R
 		repetitions = 1
 	}
 	report := Report{
-		Model: options.Model, SuiteVersion: suite.Version, CaseCount: len(suite.Cases),
+		Model: options.Model, SuiteVersion: suite.Version, CaseCount: len(suite.Cases), Repetitions: repetitions,
 		RequestCount: len(suite.Cases) * repetitions,
 		Codes:        make(map[string]*CodeScore, 6),
 		Results:      make([]CaseResult, 0, len(suite.Cases)*repetitions),
@@ -186,6 +189,8 @@ func Run(ctx context.Context, suite Suite, reviewer Reviewer, options Options) R
 		report.F1 = 2 * report.Precision * report.Recall / (report.Precision + report.Recall)
 	}
 	report.ExactMatchRate = ratio(report.ExactMatches, report.RequestCount)
+	report.ConsistentCases = consistentCases(report.Results)
+	report.ConsistencyRate = ratio(report.ConsistentCases, report.CaseCount)
 	report.ClearFalsePositiveRate = ratio(report.ClearFalsePositives, report.ClearCaseCount)
 	for _, score := range report.Codes {
 		score.Precision = ratio(score.TruePositives, score.TruePositives+score.FalsePositives)
@@ -198,6 +203,30 @@ func Run(ctx context.Context, suite Suite, reviewer Reviewer, options Options) R
 	report.P50LatencyMS = percentile(latencies, 0.50)
 	report.P95LatencyMS = percentile(latencies, 0.95)
 	return report
+}
+
+func consistentCases(results []CaseResult) int {
+	outcomes := make(map[string]string)
+	consistent := make(map[string]bool)
+	for _, result := range results {
+		outcome := fmt.Sprintf("%v|%s", result.ActualCodes, result.Error)
+		previous, exists := outcomes[result.ID]
+		if !exists {
+			outcomes[result.ID] = outcome
+			consistent[result.ID] = true
+			continue
+		}
+		if previous != outcome {
+			consistent[result.ID] = false
+		}
+	}
+	count := 0
+	for _, matches := range consistent {
+		if matches {
+			count++
+		}
+	}
+	return count
 }
 
 func updateCodeScores(scores map[string]*CodeScore, expected, actual []string) {

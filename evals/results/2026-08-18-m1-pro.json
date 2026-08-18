@@ -1,0 +1,89 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-08-18",
+  "hardware": {
+    "chip": "Apple M1 Pro",
+    "memoryBytes": 34359738368,
+    "backend": "Metal"
+  },
+  "runtime": {
+    "name": "Prism llama.cpp",
+    "version": "prism-b9599-9ca265a",
+    "commit": "9ca265a57f85f2117942490f421f64a226dd9847"
+  },
+  "rawBenchmark": {
+    "promptTokens": 512,
+    "generatedTokens": 128,
+    "repetitions": 5,
+    "flashAttention": true,
+    "gpuLayers": 99,
+    "models": {
+      "bonsai-4b": {
+        "revision": "c98e0e78bac494b090e025e955690f058caafe0a",
+        "file": "Ternary-Bonsai-4B-Q2_0.gguf",
+        "fileBytes": 1074969344,
+        "sha256": "4e0bf8b737b0431552f8c2c97695ab7c0cb214c94bcdeb4f5f267e67ddf28b8b",
+        "promptTokensPerSecond": 445.263465,
+        "generatedTokensPerSecond": 49.86717,
+        "maximumResidentBytes": 1262288896
+      },
+      "bonsai-8b": {
+        "revision": "48516770dd04643643e9f9019a2a349cf26c5dbd",
+        "file": "Bonsai-8B-Q1_0.gguf",
+        "fileBytes": 1158654496,
+        "sha256": "284a335aa3fb2ced3b1b01fcb40b08aa783e3b70832767f0dd2e3fdfa134bd54",
+        "promptTokensPerSecond": 256.178689,
+        "generatedTokensPerSecond": 49.172931,
+        "maximumResidentBytes": 1347813376
+      }
+    }
+  },
+  "semanticEval": {
+    "suiteVersion": 1,
+    "caseCount": 30,
+    "repetitions": 3,
+    "temperature": 0,
+    "models": {
+      "bonsai-4b": {
+        "precision": 0.1818,
+        "recall": 0.2222,
+        "f1": 0.2,
+        "exactMatchRate": 0.1667,
+        "clearFalsePositiveRate": 1,
+        "protocolErrors": 0,
+        "consistencyRate": 1,
+        "meanLatencyMs": 1176,
+        "p50LatencyMs": 1093,
+        "p95LatencyMs": 2176,
+        "codes": {
+          "SEM001": {"precision": 0.211, "recall": 0.8, "f1": 0.333},
+          "SEM002": {"precision": 0.1, "recall": 0.333, "f1": 0.154},
+          "SEM003": {"precision": 0, "recall": 0, "f1": 0},
+          "SEM004": {"precision": 1, "recall": 0, "f1": 0},
+          "SEM005": {"precision": 1, "recall": 0, "f1": 0},
+          "SEM006": {"precision": 0.5, "recall": 0.143, "f1": 0.222}
+        }
+      },
+      "bonsai-8b": {
+        "precision": 0.2353,
+        "recall": 0.1481,
+        "f1": 0.1818,
+        "exactMatchRate": 0.2333,
+        "clearFalsePositiveRate": 0.625,
+        "protocolErrors": 0,
+        "consistencyRate": 1,
+        "meanLatencyMs": 657,
+        "p50LatencyMs": 315,
+        "p95LatencyMs": 1320,
+        "codes": {
+          "SEM001": {"precision": 0.222, "recall": 0.4, "f1": 0.286},
+          "SEM002": {"precision": 0, "recall": 0, "f1": 0},
+          "SEM003": {"precision": 0, "recall": 0, "f1": 0},
+          "SEM004": {"precision": 1, "recall": 0, "f1": 0},
+          "SEM005": {"precision": 1, "recall": 0.5, "f1": 0.667},
+          "SEM006": {"precision": 0, "recall": 0, "f1": 0}
+        }
+      }
+    }
+  }
+}

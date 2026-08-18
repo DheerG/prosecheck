@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"time"
 
 	proseeval "github.com/DheerG/prosecheck/internal/eval"
@@ -81,11 +82,13 @@ func run(args []string, stdout, stderr io.Writer) int {
 
 func writeTextReport(w io.Writer, report proseeval.Report) {
 	fmt.Fprintf(w, "Model: %s\n", report.Model)
-	fmt.Fprintf(w, "Cases: %d (%d requests)\n", report.CaseCount, report.RequestCount)
+	fmt.Fprintf(w, "Cases: %d (%d requests; %d runs per case)\n",
+		report.CaseCount, report.RequestCount, report.Repetitions)
 	fmt.Fprintf(w, "Precision: %.1f%%\n", report.Precision*100)
 	fmt.Fprintf(w, "Recall: %.1f%%\n", report.Recall*100)
 	fmt.Fprintf(w, "F1: %.1f%%\n", report.F1*100)
 	fmt.Fprintf(w, "Exact matches: %.1f%%\n", report.ExactMatchRate*100)
+	fmt.Fprintf(w, "Consistent cases: %.1f%%\n", report.ConsistencyRate*100)
 	fmt.Fprintf(w, "Clear-case false positives: %.1f%%\n", report.ClearFalsePositiveRate*100)
 	fmt.Fprintf(w, "Protocol errors: %d\n", report.ProtocolErrors)
 	fmt.Fprintf(w, "Latency: %.0f ms mean, %.0f ms p50, %.0f ms p95\n",
@@ -98,19 +101,40 @@ func writeTextReport(w io.Writer, report proseeval.Report) {
 			code, score.Precision*100, score.Recall*100, score.F1*100)
 	}
 
-	mismatchCount := 0
+	type mismatchGroup struct {
+		result proseeval.CaseResult
+		count  int
+	}
+	groups := make([]mismatchGroup, 0)
+	groupIndexes := make(map[string]int)
 	for _, result := range report.Results {
 		if result.Exact {
 			continue
 		}
-		if mismatchCount == 0 {
-			fmt.Fprintln(w, "Mismatches:")
-		}
-		mismatchCount++
-		if result.Error != "" {
-			fmt.Fprintf(w, "  %s: expected %v; error: %s\n", result.ID, result.ExpectedCodes, result.Error)
+		key := result.ID + "|" + strings.Join(result.ExpectedCodes, ",") + "|" +
+			strings.Join(result.ActualCodes, ",") + "|" + result.Error
+		if index, exists := groupIndexes[key]; exists {
+			groups[index].count++
 			continue
 		}
-		fmt.Fprintf(w, "  %s: expected %v; got %v\n", result.ID, result.ExpectedCodes, result.ActualCodes)
+		groupIndexes[key] = len(groups)
+		groups = append(groups, mismatchGroup{result: result, count: 1})
+	}
+	if len(groups) > 0 {
+		fmt.Fprintln(w, "Mismatches:")
+	}
+	for _, group := range groups {
+		result := group.result
+		frequency := ""
+		if report.Repetitions > 1 {
+			frequency = fmt.Sprintf(" (%d/%d runs)", group.count, report.Repetitions)
+		}
+		if result.Error != "" {
+			fmt.Fprintf(w, "  %s%s: expected %v; error: %s\n",
+				result.ID, frequency, result.ExpectedCodes, result.Error)
+			continue
+		}
+		fmt.Fprintf(w, "  %s%s: expected %v; got %v\n",
+			result.ID, frequency, result.ExpectedCodes, result.ActualCodes)
 	}
 }

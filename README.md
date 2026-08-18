@@ -188,6 +188,8 @@ Use `--semantic off` to skip a reviewer that the configuration enables.
 
 Read [Run Bonsai locally](docs/bonsai.md) for storage details, file imports, and an external-server setup.
 
+Read [Compare Bonsai 4B and 8B](docs/model-comparison.md) for raw benchmarks and the synthetic semantic-review eval.
+
 ## Exit codes
 
 | Code | Meaning |

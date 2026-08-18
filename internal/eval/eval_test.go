@@ -29,11 +29,11 @@ func TestRunCalculatesClassificationMetrics(t *testing.T) {
 		"mixed":   {{Code: "SEM001"}},
 	}}
 
-	report := Run(context.Background(), suite, reviewer, Options{Model: "test", Repetitions: 1})
-	if report.TruePositives != 2 || report.FalsePositives != 1 || report.FalseNegatives != 1 {
+	report := Run(context.Background(), suite, reviewer, Options{Model: "test", Repetitions: 2})
+	if report.TruePositives != 4 || report.FalsePositives != 2 || report.FalseNegatives != 2 {
 		t.Fatalf("unexpected counts: %#v", report)
 	}
-	if report.ExactMatches != 1 || report.ClearFalsePositiveRate != 1 {
+	if report.ExactMatches != 2 || report.ClearFalsePositiveRate != 1 || report.ConsistencyRate != 1 {
 		t.Fatalf("unexpected match rates: %#v", report)
 	}
 	if report.F1 < 0.66 || report.F1 > 0.67 {
@@ -63,5 +63,17 @@ func TestValidateRejectsDuplicateIDs(t *testing.T) {
 	}}
 	if err := suite.Validate(); err == nil {
 		t.Fatal("expected duplicate IDs to fail")
+	}
+}
+
+func TestConsistentCasesFindsChangedResults(t *testing.T) {
+	results := []CaseResult{
+		{ID: "changed", ActualCodes: []string{"SEM001"}},
+		{ID: "changed", ActualCodes: []string{"SEM002"}},
+		{ID: "stable", ActualCodes: []string{"SEM003"}},
+		{ID: "stable", ActualCodes: []string{"SEM003"}},
+	}
+	if count := consistentCases(results); count != 1 {
+		t.Fatalf("expected one consistent case, got %d", count)
 	}
 }
