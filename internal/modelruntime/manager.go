@@ -140,13 +140,14 @@ func (m *Manager) Start(ctx context.Context, preferredPort int) (State, error) {
 		_ = logFile.Close()
 		return State{}, fmt.Errorf("cannot start the Prism runtime: %w", err)
 	}
+	pid := command.Process.Pid
 	_ = logFile.Close()
 	if err := command.Process.Release(); err != nil {
 		_ = command.Process.Kill()
 		return State{}, fmt.Errorf("cannot detach the Prism runtime: %w", err)
 	}
 	state := State{
-		PID: command.Process.Pid, Port: port, Endpoint: endpoint, Model: ModelName,
+		PID: pid, Port: port, Endpoint: endpoint, Model: ModelName,
 		RuntimeVersion: RuntimeVersion, ServerPath: server, StartedAt: time.Now().UTC(),
 	}
 	if err := m.writeState(state); err != nil {
@@ -183,6 +184,9 @@ func (m *Manager) Stop(ctx context.Context) error {
 	}
 	if !m.healthy(ctx, state.Endpoint) {
 		return m.removeState()
+	}
+	if state.PID < 1 {
+		return errors.New("the model state has no valid process ID; stop the server manually and start it again")
 	}
 	process, err := os.FindProcess(state.PID)
 	if err != nil {
