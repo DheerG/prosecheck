@@ -17,6 +17,10 @@ SEM004: Local jargon or shorthand makes the message unclear.
 SEM005: The message conflicts with the supplied diff. Use only when a diff exists.
 SEM006: The subject is too broad to identify the actual outcome.
 
+For SEM005, name the exact claim and the conflicting change. Do not report SEM005
+when the message and diff agree. A finding is invalid if its problem or correction
+says that there is no conflict, or that the message and diff agree.
+
 Return exactly CLEAR when no rule applies.
 Otherwise, return one line for each finding in this format:
 CODE | concrete problem | concrete correction

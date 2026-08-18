@@ -97,23 +97,25 @@ func (c *Client) Review(ctx context.Context, message, diff string) ([]checker.Fi
 	if err != nil {
 		return nil, err
 	}
-	return parseReview(content)
+	return parseReview(content, diff != "")
 }
 
-func parseReview(content string) ([]checker.Finding, error) {
+func parseReview(content string, hasDiff bool) ([]checker.Finding, error) {
 	content = stripThinking(content)
 	if strings.EqualFold(strings.TrimSpace(content), "clear") {
 		return []checker.Finding{}, nil
 	}
 
 	findings := make([]checker.Finding, 0, 3)
+	foundLineResult := false
 	for _, line := range strings.Split(content, "\n") {
 		matches := findingLine.FindStringSubmatch(strings.TrimSpace(line))
 		if len(matches) != 4 {
 			continue
 		}
+		foundLineResult = true
 		item := modelFinding{Code: matches[1], Message: strings.TrimSpace(matches[2]), Suggestion: strings.TrimSpace(matches[3])}
-		if copiedPlaceholder(item) {
+		if !usableFinding(item, hasDiff) {
 			continue
 		}
 		findings = append(findings, checker.Finding{
@@ -121,7 +123,7 @@ func parseReview(content string) ([]checker.Finding, error) {
 			Message: item.Message, Suggestion: item.Suggestion,
 		})
 	}
-	if len(findings) > 0 {
+	if foundLineResult {
 		return findings, nil
 	}
 
@@ -139,7 +141,7 @@ func parseReview(content string) ([]checker.Finding, error) {
 		item.Code = strings.ToUpper(strings.TrimSpace(item.Code))
 		item.Message = strings.TrimSpace(item.Message)
 		item.Suggestion = strings.TrimSpace(item.Suggestion)
-		if !allowedCodes[item.Code] || item.Message == "" || copiedPlaceholder(item) {
+		if !allowedCodes[item.Code] || item.Message == "" || !usableFinding(item, hasDiff) {
 			continue
 		}
 		jsonFindings = append(jsonFindings, checker.Finding{
@@ -167,6 +169,41 @@ func stripThinking(content string) string {
 func copiedPlaceholder(item modelFinding) bool {
 	return strings.EqualFold(item.Message, "clear problem") ||
 		strings.EqualFold(item.Suggestion, "specific correction")
+}
+
+func usableFinding(item modelFinding, hasDiff bool) bool {
+	if copiedPlaceholder(item) {
+		return false
+	}
+	if item.Code != "SEM005" {
+		return true
+	}
+	if !hasDiff {
+		return false
+	}
+
+	text := strings.ToLower(item.Message + " " + item.Suggestion)
+	for _, phrase := range []string{
+		"no conflict",
+		"not a conflict",
+		"does not conflict",
+		"do not conflict",
+		"message and diff agree",
+		"diff and message agree",
+		"message agrees with the diff",
+		"diff agrees with the message",
+		"message is consistent with the diff",
+		"diff is consistent with the message",
+		"message matches the diff",
+		"diff matches the message",
+		"message aligns with the diff",
+		"diff aligns with the message",
+	} {
+		if strings.Contains(text, phrase) {
+			return false
+		}
+	}
+	return !strings.EqualFold(strings.TrimSpace(item.Message), "The message conflicts with the supplied diff. Use only when a diff exists.")
 }
 
 func (c *Client) send(ctx context.Context, payload chatRequest) (string, int, error) {
