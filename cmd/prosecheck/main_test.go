@@ -132,7 +132,7 @@ func TestRunInitCreatesRecommendedConfigurationAndHook(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !cfg.SimpleEnglish.Enabled || cfg.Semantic.Enabled {
+	if !cfg.SimpleEnglish.Enabled || cfg.SimpleEnglish.Mode != config.SimpleEnglishPragmatic || cfg.Semantic.Enabled {
 		t.Fatalf("unexpected configuration: %#v", cfg)
 	}
 	hookPath := filepath.Join(repository, ".git", "hooks", "commit-msg")
@@ -151,11 +151,44 @@ func TestChooseInitOptionsUsesInteractiveDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !choices.simpleEnglish || choices.semantic || !choices.hook {
+	if choices.simpleEnglishMode != config.SimpleEnglishPragmatic || choices.semantic || !choices.hook {
 		t.Fatalf("unexpected choices: %#v", choices)
 	}
 	if !strings.Contains(output.String(), "large download") {
 		t.Fatalf("expected a model explanation, got %q", output.String())
+	}
+}
+
+func TestChooseInitOptionsAcceptsStrictSimpleEnglish(t *testing.T) {
+	var output bytes.Buffer
+	reader := answerReader{scanner: bufio.NewScanner(strings.NewReader("")), output: &output}
+	choices, err := chooseInitOptions(reader, true, false, "strict", "off", "on")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if choices.simpleEnglishMode != config.SimpleEnglishStrict {
+		t.Fatalf("expected strict Simple English, got %#v", choices)
+	}
+}
+
+func TestSimpleEnglishModeRejectsOldOnValue(t *testing.T) {
+	if validSimpleEnglishMode("on") {
+		t.Fatal("expected the old on value to fail")
+	}
+}
+
+func TestChooseInitOptionsExplainsStrictMode(t *testing.T) {
+	var output bytes.Buffer
+	reader := answerReader{scanner: bufio.NewScanner(strings.NewReader("\ny\nn\nn\n")), output: &output}
+	choices, err := chooseInitOptions(reader, false, true, "", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if choices.simpleEnglishMode != config.SimpleEnglishStrict || choices.semantic || choices.hook {
+		t.Fatalf("unexpected choices: %#v", choices)
+	}
+	if !strings.Contains(output.String(), "Strict mode") {
+		t.Fatalf("expected a strict mode explanation, got %q", output.String())
 	}
 }
 

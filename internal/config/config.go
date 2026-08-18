@@ -42,9 +42,15 @@ type SemanticConfig struct {
 
 type SimpleEnglishConfig struct {
 	Enabled  bool     `json:"enabled"`
+	Mode     string   `json:"mode"`
 	Severity string   `json:"severity"`
 	Allow    []string `json:"allow"`
 }
+
+const (
+	SimpleEnglishPragmatic = "pragmatic"
+	SimpleEnglishStrict    = "strict"
+)
 
 func Write(path string, cfg Config) error {
 	if err := cfg.Validate(); err != nil {
@@ -86,7 +92,7 @@ func Default() Config {
 		Body:    BodyConfig{MaxLineLength: 100, MaxSentenceWords: 25},
 		Rules:   map[string]string{},
 		SimpleEnglish: SimpleEnglishConfig{
-			Enabled: true, Severity: "warning", Allow: []string{},
+			Enabled: true, Mode: SimpleEnglishPragmatic, Severity: "warning", Allow: []string{},
 		},
 		Semantic: SemanticConfig{
 			Runtime: "managed", Model: "bonsai-8b",
@@ -148,6 +154,9 @@ func (c Config) Validate() error {
 	}
 	if !validSeverity(c.SimpleEnglish.Severity, false) {
 		return errors.New("simpleEnglish.severity must be error, warning, or info")
+	}
+	if c.SimpleEnglish.Mode != SimpleEnglishPragmatic && c.SimpleEnglish.Mode != SimpleEnglishStrict {
+		return errors.New("simpleEnglish.mode must be pragmatic or strict")
 	}
 	for code, severity := range c.Rules {
 		if !validSeverity(severity, true) {

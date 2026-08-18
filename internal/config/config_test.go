@@ -33,7 +33,7 @@ func TestLoadMergesFileWithDefaults(t *testing.T) {
 	if cfg.Semantic.Runtime != "managed" {
 		t.Fatalf("expected the managed runtime, got %q", cfg.Semantic.Runtime)
 	}
-	if !cfg.SimpleEnglish.Enabled || cfg.SimpleEnglish.Severity != "warning" {
+	if !cfg.SimpleEnglish.Enabled || cfg.SimpleEnglish.Mode != SimpleEnglishPragmatic || cfg.SimpleEnglish.Severity != "warning" {
 		t.Fatalf("simple English defaults were not merged: %#v", cfg.SimpleEnglish)
 	}
 }
@@ -97,6 +97,14 @@ func TestValidateRejectsBadSimpleEnglishSeverity(t *testing.T) {
 	cfg.SimpleEnglish.Severity = "sometimes"
 	if err := cfg.Validate(); err == nil {
 		t.Fatal("expected an invalid Simple English severity to fail")
+	}
+}
+
+func TestValidateRejectsBadSimpleEnglishMode(t *testing.T) {
+	cfg := Default()
+	cfg.SimpleEnglish.Mode = "sometimes"
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("expected an invalid Simple English mode to fail")
 	}
 }
 

@@ -59,7 +59,7 @@ Use the recommended choices without questions:
 prosecheck init --yes
 ```
 
-This choice enables Simple English and installs the Git hook. It does not install the optional model.
+This choice enables pragmatic Simple English and installs the Git hook. It does not install the optional model.
 
 Enable the model during an automated setup:
 
@@ -68,6 +68,12 @@ prosecheck init --yes --semantic on
 ```
 
 Use `prosecheck init --advanced` to answer every feature question. The command never stages the new configuration in Git.
+
+Select strict Simple English without questions:
+
+```sh
+prosecheck init --yes --simple-english strict
+```
 
 ## Check a message
 
@@ -145,7 +151,7 @@ Each rule can use `error`, `warning`, `info`, or `off`.
 ```json
 {
   "rules": {
-    "PC017": "info",
+    "PC017": "warning",
     "PC005": "error"
   }
 }
@@ -155,12 +161,17 @@ The file merges with the default configuration. You only need to include values 
 
 ### Simple English
 
-Simple English is enabled by default. Its local rules find contractions, indirect phrases, uncertain modal verbs, and complex verb tenses.
+Simple English is enabled by default in pragmatic mode. Its local rules find contractions, indirect phrases, modal verbs, and complex tenses.
+
+Pragmatic mode blocks high-confidence findings. It reports modal verbs and complex tenses as notes.
+
+Strict mode applies the configured severity to every Simple English rule.
 
 ```json
 {
   "simpleEnglish": {
     "enabled": true,
+    "mode": "pragmatic",
     "severity": "warning",
     "allow": ["OAuth", "SAML", "webhook"]
   }
@@ -265,9 +276,9 @@ Read [Compare Bonsai 4B and 8B](docs/model-comparison.md) for raw benchmarks and
 | `PC014` | Body contains a semicolon | Warning with Simple English |
 | `PC015` | Text contains a contraction | Warning |
 | `PC016` | Text contains a wordy or indirect phrase | Warning |
-| `PC017` | A modal verb makes the meaning uncertain | Warning |
+| `PC017` | A modal verb makes the meaning uncertain | Note in pragmatic mode |
 | `PC018` | Text contains a Latin abbreviation | Warning |
-| `PC019` | Text uses a complex verb tense | Warning |
+| `PC019` | Text uses a complex verb tense | Note in pragmatic mode |
 | `SEM001`–`SEM006` | Optional model findings | Information |
 
 Merge commits, revert commits, and autosquash subjects do not use these rules.

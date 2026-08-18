@@ -172,6 +172,43 @@ func TestSimpleEnglishSeverityAndRuleOverride(t *testing.T) {
 	}
 }
 
+func TestPragmaticSimpleEnglishKeepsContextRulesAsNotes(t *testing.T) {
+	cfg := config.Default()
+	report := Check("Keep retry state\n\nThe worker might lose records that have been saved.", cfg)
+
+	found := 0
+	for _, finding := range report.Findings {
+		if finding.Code == "PC017" || finding.Code == "PC019" {
+			found++
+			if finding.Severity != SeverityInfo {
+				t.Fatalf("expected %s to be a note, got %s", finding.Code, finding.Severity)
+			}
+		}
+	}
+	if found != 2 {
+		t.Fatalf("expected two context findings, got %#v", report.Findings)
+	}
+}
+
+func TestStrictSimpleEnglishEnforcesContextRules(t *testing.T) {
+	cfg := config.Default()
+	cfg.SimpleEnglish.Mode = config.SimpleEnglishStrict
+	report := Check("Keep retry state\n\nThe worker might lose records that have been saved.", cfg)
+
+	found := 0
+	for _, finding := range report.Findings {
+		if finding.Code == "PC017" || finding.Code == "PC019" {
+			found++
+			if finding.Severity != SeverityWarning {
+				t.Fatalf("expected %s to be a warning, got %s", finding.Code, finding.Severity)
+			}
+		}
+	}
+	if found != 2 {
+		t.Fatalf("expected two context findings, got %#v", report.Findings)
+	}
+}
+
 func TestParseIgnoresGitComments(t *testing.T) {
 	message := Parse("\nKeep cache keys stable\n\nThe old keys remain readable.\n# Please enter the commit message\n")
 	if message.Subject != "Keep cache keys stable" {

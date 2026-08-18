@@ -10,6 +10,7 @@
   "rules": {},
   "simpleEnglish": {
     "enabled": true,
+    "mode": "pragmatic",
     "severity": "warning",
     "allow": ["OAuth", "SAML", "webhook"]
   },

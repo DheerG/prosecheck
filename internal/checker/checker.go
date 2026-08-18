@@ -110,7 +110,7 @@ func Check(raw string, cfg config.Config) Report {
 		if strings.Contains(line.Text, ";") {
 			severity := SeverityInfo
 			if cfg.SimpleEnglish.Enabled {
-				severity = configuredSimpleEnglishSeverity(cfg.SimpleEnglish.Severity)
+				severity = configuredSimpleEnglishSeverity("PC014", cfg.SimpleEnglish)
 			}
 			add("PC014", severity, "A body line contains a semicolon.",
 				"Use two sentences when the line contains two separate facts.", line.Number)
@@ -131,8 +131,8 @@ func Check(raw string, cfg config.Config) Report {
 	}
 
 	if cfg.SimpleEnglish.Enabled {
-		severity := configuredSimpleEnglishSeverity(cfg.SimpleEnglish.Severity)
 		for _, issue := range simpleEnglishIssues(message, cfg.SimpleEnglish.Allow) {
+			severity := configuredSimpleEnglishSeverity(issue.Code, cfg.SimpleEnglish)
 			add(issue.Code, severity, issue.Message, issue.Suggestion, issue.Line)
 		}
 	}
@@ -141,8 +141,11 @@ func Check(raw string, cfg config.Config) Report {
 	return report
 }
 
-func configuredSimpleEnglishSeverity(value string) Severity {
-	switch strings.ToLower(value) {
+func configuredSimpleEnglishSeverity(code string, cfg config.SimpleEnglishConfig) Severity {
+	if cfg.Mode == config.SimpleEnglishPragmatic && (code == "PC017" || code == "PC019") {
+		return SeverityInfo
+	}
+	switch strings.ToLower(cfg.Severity) {
 	case "error":
 		return SeverityError
 	case "info":

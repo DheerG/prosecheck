@@ -19,9 +19,9 @@ import (
 )
 
 type initChoices struct {
-	simpleEnglish bool
-	semantic      bool
-	hook          bool
+	simpleEnglishMode string
+	semantic          bool
+	hook              bool
 }
 
 type answerReader struct {
@@ -35,7 +35,7 @@ func runInit(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	yes := fs.Bool("yes", false, "use recommended choices without questions")
 	advanced := fs.Bool("advanced", false, "choose each feature")
 	repository := fs.String("repository", "", "set up this Git repository")
-	simpleEnglish := fs.String("simple-english", "", "Simple English rules: on or off")
+	simpleEnglish := fs.String("simple-english", "", "Simple English: pragmatic, strict, or off")
 	semantic := fs.String("semantic", "", "private AI review on this computer: on or off")
 	installHook := fs.String("hook", "", "Git commit hook: on or off")
 	if err := fs.Parse(args); err != nil {
@@ -49,10 +49,13 @@ func runInit(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "Use --yes or --advanced, not both.")
 		return 2
 	}
+	if !validSimpleEnglishMode(*simpleEnglish) {
+		fmt.Fprintln(stderr, "--simple-english must be pragmatic, strict, or off.")
+		return 2
+	}
 	for name, value := range map[string]string{
-		"--simple-english": *simpleEnglish,
-		"--semantic":       *semantic,
-		"--hook":           *installHook,
+		"--semantic": *semantic,
+		"--hook":     *installHook,
 	} {
 		if !validToggle(value) {
 			fmt.Fprintf(stderr, "%s must be on or off.\n", name)
@@ -135,7 +138,10 @@ func runInit(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 
 	if writeConfig {
-		cfg.SimpleEnglish.Enabled = choices.simpleEnglish
+		cfg.SimpleEnglish.Enabled = choices.simpleEnglishMode != "off"
+		if cfg.SimpleEnglish.Enabled {
+			cfg.SimpleEnglish.Mode = choices.simpleEnglishMode
+		}
 		cfg.Semantic.Enabled = choices.semantic
 		if choices.semantic {
 			cfg.Semantic.Runtime = "managed"
@@ -172,16 +178,16 @@ func runInit(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 }
 
 func chooseInitOptions(reader answerReader, yes, advanced bool, simpleValue, semanticValue, hookValue string) (initChoices, error) {
-	choices := initChoices{simpleEnglish: true, semantic: false, hook: true}
+	choices := initChoices{simpleEnglishMode: config.SimpleEnglishPragmatic, semantic: false, hook: true}
 	if yes {
-		applyToggle(&choices.simpleEnglish, simpleValue)
+		applySimpleEnglishMode(&choices.simpleEnglishMode, simpleValue)
 		applyToggle(&choices.semantic, semanticValue)
 		applyToggle(&choices.hook, hookValue)
 		return choices, nil
 	}
 
 	if !advanced && simpleValue == "" && hookValue == "" {
-		fmt.Fprintln(reader.output, "The recommended setup checks each commit and enforces Simple English.")
+		fmt.Fprintln(reader.output, "The recommended setup checks each commit and uses pragmatic Simple English.")
 		fmt.Fprintln(reader.output, "A built-in rule can stop a commit until you correct its message.")
 		recommended, err := reader.ask("Use the recommended local rules and Git hook?", true)
 		if err != nil {
@@ -192,10 +198,22 @@ func chooseInitOptions(reader answerReader, yes, advanced bool, simpleValue, sem
 	if advanced {
 		var err error
 		if simpleValue == "" {
-			fmt.Fprintln(reader.output, "Simple English rejects contractions, wordy phrases, and uncertain modal verbs.")
-			choices.simpleEnglish, err = reader.ask("Enforce Simple English?", true)
-			if err != nil {
-				return choices, err
+			fmt.Fprintln(reader.output, "Pragmatic mode blocks clear problems and reports uncertain grammar as notes.")
+			enabled, askErr := reader.ask("Use Simple English?", true)
+			if askErr != nil {
+				return choices, askErr
+			}
+			if !enabled {
+				choices.simpleEnglishMode = "off"
+			} else {
+				fmt.Fprintln(reader.output, "Strict mode also blocks modal verbs and complex verb tenses.")
+				strict, strictErr := reader.ask("Use strict Simple English?", false)
+				if strictErr != nil {
+					return choices, strictErr
+				}
+				if strict {
+					choices.simpleEnglishMode = config.SimpleEnglishStrict
+				}
 			}
 		}
 		if hookValue == "" {
@@ -205,7 +223,7 @@ func chooseInitOptions(reader answerReader, yes, advanced bool, simpleValue, sem
 			}
 		}
 	}
-	applyToggle(&choices.simpleEnglish, simpleValue)
+	applySimpleEnglishMode(&choices.simpleEnglishMode, simpleValue)
 	applyToggle(&choices.hook, hookValue)
 
 	if semanticValue == "" {
@@ -252,6 +270,22 @@ func validToggle(value string) bool {
 	return value == "" || value == "on" || value == "off"
 }
 
+func validSimpleEnglishMode(value string) bool {
+	return value == "" || value == "off" ||
+		value == config.SimpleEnglishPragmatic || value == config.SimpleEnglishStrict
+}
+
+func applySimpleEnglishMode(target *string, value string) {
+	switch value {
+	case config.SimpleEnglishPragmatic:
+		*target = config.SimpleEnglishPragmatic
+	case config.SimpleEnglishStrict:
+		*target = config.SimpleEnglishStrict
+	case "off":
+		*target = "off"
+	}
+}
+
 func applyToggle(target *bool, value string) {
 	if value != "" {
 		*target = value == "on"
@@ -260,7 +294,7 @@ func applyToggle(target *bool, value string) {
 
 func writeInitSummary(output io.Writer, choices initChoices) {
 	fmt.Fprintln(output, "Selected setup:")
-	fmt.Fprintf(output, "  Simple English: %s\n", toggleLabel(choices.simpleEnglish))
+	fmt.Fprintf(output, "  Simple English: %s\n", choices.simpleEnglishMode)
 	fmt.Fprintf(output, "  Private AI review: %s\n", toggleLabel(choices.semantic))
 	fmt.Fprintf(output, "  Git commit hook: %s\n", toggleLabel(choices.hook))
 }
