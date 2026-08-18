@@ -1,241 +1,176 @@
 # prosecheck
 
-prosecheck finds unclear Git commit messages before they enter the project history.
+prosecheck keeps agent-written Git history useful.
 
-The command uses fast local rules by default. An optional local model can find missing context and vague language.
+Coding agents often describe changed files or recent actions. These messages lose value when the task ends.
 
-The Git hook does not need GitHub Actions. It runs on each local computer and does not use an external API.
+Message standards can also drift between agents, tools, and sessions. prosecheck turns those standards into one shared policy.
 
-## Current scope
+prosecheck checks each commit message before Git records it. It helps people and agents understand what changed, why it changed, and which decisions still matter.
 
-This first version checks commit subjects and bodies. Support for pull request text will use the same checker in a later version.
-
-prosecheck finds these common problems:
-
-- Empty or temporary subjects, such as `WIP`
-- Vague subjects, such as `Update code`
-- Past-tense subjects, such as `Updated account checks`
-- Missing blank lines after the subject
-- Bodies that start with file lists or implementation details
-- Bodies that narrate the commit process
-- Long lines and long sentences
-- Contractions, wordy phrases, and uncertain modal verbs
-- Context that will not make sense later
-
-## Build prosecheck
-
-Go 1.22 or a later compatible release is required.
-
-```sh
-go test ./...
-go install ./cmd/prosecheck
+```text
+Update auth files
 ```
 
-Make sure that the Go binary directory is on `PATH`. Then run this command:
+becomes:
 
-```sh
-prosecheck version
+```text
+Prevent expired sessions from reaching account pages
+
+Reject the session before route handlers run. This keeps the access rule consistent across account pages.
 ```
 
-You can also install the latest public version:
+The check runs on the local computer. It does not require a hosted service or spend GitHub Actions minutes.
+
+## Install
+
+### macOS or Linux
 
 ```sh
-go install github.com/DheerG/prosecheck/cmd/prosecheck@latest
+curl -fsSL https://raw.githubusercontent.com/DheerG/prosecheck/main/install.sh | sh
 ```
 
-## Set up a repository
+### Windows PowerShell
 
-Run the guided setup from any directory inside the Git repository:
+```powershell
+irm https://raw.githubusercontent.com/DheerG/prosecheck/main/install.ps1 | iex
+```
+
+The installers download the correct binary from the latest GitHub release. They verify its SHA-256 checksum and do not require Go.
+
+You can also download an archive from the [GitHub releases page](https://github.com/DheerG/prosecheck/releases).
+
+## Start
+
+Open a Git repository and run:
 
 ```sh
 prosecheck init
+git add .prosecheck.json
 ```
 
-The setup explains the local rules, Git hook, and optional model. It asks before it writes files or downloads the model.
+The guided setup creates a shared policy and connects the local Git hook. It explains each choice before it changes the repository.
 
-Use the recommended choices without questions:
+Use the recommended setup without questions:
 
 ```sh
 prosecheck init --yes
 ```
 
-This choice enables strict Simple English and installs the Git hook. It does not install the optional model.
+The recommended setup uses strict Simple English and blocks commits with warnings. It does not install the optional model.
 
-Enable the model during an automated setup:
+## What prosecheck catches
 
-```sh
-prosecheck init --yes --semantic on
-```
+prosecheck finds common sources of weak history:
 
-Use `prosecheck init --advanced` to answer every feature question. The command never stages the new configuration in Git.
+- Temporary or vague subjects, such as `WIP` or `Update code`
+- Subjects that describe activity instead of the result
+- Bodies that list files but omit the reason for the change
+- Implementation detail that hides the effect on the system
+- Context that will not make sense after the current task
+- Long, indirect, or uncertain language
 
-Select pragmatic Simple English without questions:
+Merge commits, reverts, and autosquash commits keep their standard formats.
 
-```sh
-prosecheck init --yes --simple-english pragmatic
-```
+## How it works
 
-## Check a message
+Fast local rules perform every check. They produce the same result without a network connection or external API.
 
-Pass a message directly:
+An optional local model can review meaning. It finds missing reasons, local shorthand, and differences between the message and the staged change.
+
+Model findings are notes in this version. They do not block a commit. The model runs on your computer and does not use Ollama.
+
+This design gives each repository one durable policy. Any person or agent that uses Git receives the same feedback.
+
+## Common commands
+
+Check text directly:
 
 ```sh
 prosecheck check --message "Prevent duplicate invoice delivery"
 ```
 
-Pass a message file:
+Check a message file:
 
 ```sh
 prosecheck check .git/COMMIT_EDITMSG
 ```
 
-Pass a message through standard input:
-
-```sh
-git log -1 --format=%B | prosecheck check
-```
-
-Warnings cause an error by default. Allow warnings for one manual check with `--strict=false`.
-
-```sh
-prosecheck check --strict=false --message "Updated code"
-```
-
-If another program reads the result, use `--format json`.
-
-## Install only the Git hook
-
-Use `prosecheck init` for a first setup. Use `install-hook` when the repository already has a configuration.
-
-The hook calls `prosecheck` from `PATH`. Run this command in the repository:
+Install the hook when a policy already exists:
 
 ```sh
 prosecheck install-hook
 ```
 
-The hook blocks a commit when a local rule reports an error or warning.
+Allow warnings for one manual check:
 
-Bypass the check only when you cannot correct the message:
+```sh
+prosecheck check --strict=false --message "Updated account checks"
+```
+
+Bypass one commit only when you cannot correct its message:
 
 ```sh
 PROSECHECK_BYPASS=1 git commit
 ```
 
-Prosecheck prints a notice when it skips the check. The variable applies to one command unless you export it.
-
-The installer uses these rules:
-
-| Repository setup | Installer action |
-|---|---|
-| Plain Git | Create a managed `commit-msg` hook. |
-| Custom Git hooks path | Create the hook in the configured path. |
-| Husky | Add a managed block to `.husky/commit-msg`. |
-| Lefthook | Show the entry to add to the Lefthook configuration. |
-| pre-commit | Show the local hook entry and installation command. |
-| Overcommit | Show the entry to add to `.overcommit.yml`. |
-
-The installer never replaces an existing custom hook. It also never changes Husky files in `.husky/_`.
-
-Remove a hook that prosecheck manages:
-
-```sh
-prosecheck uninstall-hook
-```
-
-Read [Connect prosecheck to Git hooks](docs/hooks.md) for manager-specific examples.
+prosecheck prints a notice when it skips the check.
 
 ## Configuration
 
-The guided setup creates `.prosecheck.json`. You can also copy the example file into the project root:
+`prosecheck init` writes `.prosecheck.json` in the repository root. Commit this file so people and agents share the same policy.
 
-```sh
-cp .prosecheck.example.json .prosecheck.json
-```
-
-prosecheck searches for `.prosecheck.json` from the Git project root. Use `--config` to select a different file.
-
-Each rule can use `error`, `warning`, `info`, or `off`.
+You only need to record values that differ from the defaults:
 
 ```json
 {
   "rules": {
-    "PC017": "warning",
+    "PC017": "info",
     "PC005": "error"
   }
 }
 ```
 
-The file merges with the default configuration. You only need to include values that you want to change.
+Each rule accepts `error`, `warning`, `info`, or `off`.
 
 ### Simple English
 
-Simple English is enabled by default in strict mode. Its local rules find contractions, indirect phrases, modal verbs, and complex tenses.
+Simple English is enabled in strict mode by default. It finds contractions, indirect phrases, modal verbs, and complex verb tenses.
 
-Pragmatic mode blocks high-confidence findings. It reports modal verbs and complex tenses as notes.
-
-Strict mode applies the configured severity to every Simple English rule.
+Pragmatic mode reports modal verbs and complex tenses as notes. It still blocks high-confidence language problems.
 
 ```json
 {
   "simpleEnglish": {
     "enabled": true,
-    "mode": "strict",
+    "mode": "pragmatic",
     "severity": "warning",
     "allow": ["OAuth", "SAML", "webhook"]
   }
 }
 ```
 
-The `allow` list protects project terms that overlap a language rule. Code in backticks and quoted errors are also protected.
-
 The profile uses practical rules from Simplified Technical English. It does not claim full ASD-STE100 compliance.
 
-Read [Use Simple English](docs/simple-english.md) for the complete policy and examples.
+Read [Use Simple English](docs/simple-english.md) for the policy and examples.
 
-## Add a local model review
+### Private model review
 
-The local model review is optional. Local rules work without a model.
+Enable the model during setup:
 
-The reviewer checks for these problems:
+```sh
+prosecheck init --yes --semantic on
+```
 
-- Context that will disappear
-- Missing reasons
-- Important outcomes hidden by details
-- Local jargon or shorthand
-- Differences between the message and the staged diff
-- Subjects that do not identify the outcome
-
-Model findings are notes in this version. They do not block a commit, even when the hook uses strict mode.
-
-The guided setup can install the model. You can also install it directly:
+Or install it separately:
 
 ```sh
 prosecheck model install ministral-3-8b
 ```
 
-This command downloads a pinned local runtime and a 5.20 GB model file. It shows the download progress and verifies both files.
+The command downloads a pinned runtime and a 5.20 GB model. It shows progress and stores the model in the standard Hugging Face cache.
 
-The model uses the standard Hugging Face cache. Other compatible local tools can reuse the same file.
-
-Enable the reviewer in `.prosecheck.json`:
-
-```json
-{
-  "semantic": {
-    "enabled": true,
-    "runtime": "managed",
-    "model": "ministral-3-8b",
-    "timeout": "20s",
-    "maxDiffBytes": 12000
-  }
-}
-```
-
-prosecheck starts the model when a check needs it. The server listens only on the local computer.
-
-The preferred port is `11435`. If that port is busy, prosecheck selects a free port and records it outside the repository.
-
-Use these commands to inspect or control the model:
+Useful model commands:
 
 ```sh
 prosecheck model status
@@ -244,63 +179,35 @@ prosecheck model logs
 prosecheck model stop
 ```
 
-The managed runtime does not use Ollama.
+Read [Run the local model](docs/local-model.md) for storage, privacy, and external-server settings.
 
-Use `--semantic on` for one required model review. The command returns an operational error when the model cannot respond.
+Read [Compare local models](docs/model-comparison.md) for benchmark and synthetic evaluation results.
 
-```sh
-prosecheck check --semantic on --message "Explain the durable outcome"
-```
+## Reference
 
-Use `--semantic off` to skip a reviewer that the configuration enables.
+- [Rules and exit codes](docs/rules.md)
+- [Git hooks and hook managers](docs/hooks.md)
+- [Simple English policy](docs/simple-english.md)
+- [Local model](docs/local-model.md)
+- [Model comparison](docs/model-comparison.md)
 
-Read [Run the local model](docs/local-model.md) for storage details, file imports, and an external-server setup.
-
-Read [Compare local models](docs/model-comparison.md) for the synthetic semantic-review eval and the model choice.
-
-## Exit codes
-
-| Code | Meaning |
-|---:|---|
-| `0` | The message passed the active policy. |
-| `1` | The message failed the active policy. |
-| `2` | prosecheck did not complete the check. |
-
-## Rule reference
-
-| Rule | Meaning | Default |
-|---|---|---|
-| `PC001` | Empty subject | Error |
-| `PC002` | Subject exceeds the character limit | Warning |
-| `PC003` | Subject gives too little information | Warning |
-| `PC004` | Subject ends with a period | Warning |
-| `PC005` | Subject is a temporary label | Error |
-| `PC006` | Subject names work but not its outcome | Warning |
-| `PC007` | Subject starts in the past tense | Warning |
-| `PC008` | Blank line is missing after the subject | Warning |
-| `PC009` | Body starts with implementation details | Warning |
-| `PC010` | Body narrates the commit process | Warning |
-| `PC011` | Body line exceeds the character limit | Warning |
-| `PC012` | Body sentence exceeds the word limit | Warning |
-| `PC013` | Body repeats the subject | Information |
-| `PC014` | Body contains a semicolon | Warning with Simple English |
-| `PC015` | Text contains a contraction | Warning |
-| `PC016` | Text contains a wordy or indirect phrase | Warning |
-| `PC017` | A modal verb makes the meaning uncertain | Warning |
-| `PC018` | Text contains a Latin abbreviation | Warning |
-| `PC019` | Text uses a complex verb tense | Warning |
-| `SEM001`–`SEM006` | Optional model findings | Information |
-
-Merge commits, revert commits, and autosquash subjects do not use these rules.
+Commit messages are the current focus. A later version can apply the same policy to pull request titles and descriptions.
 
 ## Development
 
-Run all automated checks:
+Go 1.22 or a later compatible release is required for source builds.
 
 ```sh
-gofmt -w cmd internal
 go test ./...
-go vet ./...
+go install ./cmd/prosecheck
+```
+
+You can also install the current source version:
+
+```sh
+go install github.com/DheerG/prosecheck/cmd/prosecheck@latest
 ```
 
 The project uses only the Go standard library. Tests do not require a model download.
+
+Maintainers can read [Create a release](docs/releases.md) for the tag and package process.

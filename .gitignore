@@ -1,4 +1,5 @@
 /bin/
+/dist/
 /prosecheck
 *.gguf
 .DS_Store
