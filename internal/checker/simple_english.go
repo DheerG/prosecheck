@@ -170,6 +170,7 @@ func plainEnglishText(text string, allowed []string) string {
 	}
 
 	plain := builder.String()
+	plain = removeTechnicalTokens(plain)
 	for _, term := range allowed {
 		term = strings.TrimSpace(term)
 		if term == "" {
@@ -178,6 +179,43 @@ func plainEnglishText(text string, allowed []string) string {
 		plain = replaceFold(plain, term)
 	}
 	return strings.TrimSpace(plain)
+}
+
+func removeTechnicalTokens(text string) string {
+	fields := strings.Fields(text)
+	for index, field := range fields {
+		trimmed := strings.Trim(field, "()[]{}<>,;:!?\"")
+		trimmed = strings.TrimSuffix(trimmed, ".")
+		if isTechnicalToken(trimmed) {
+			fields[index] = ""
+		}
+	}
+	return strings.Join(fields, " ")
+}
+
+func isTechnicalToken(value string) bool {
+	if strings.HasPrefix(value, "--") || strings.HasPrefix(value, ".") ||
+		strings.Contains(value, "://") || strings.Contains(value, "::") ||
+		strings.ContainsAny(value, "/\\_=") {
+		return true
+	}
+	extension := strings.ToLower(strings.TrimPrefix(filepathExtension(value), "."))
+	switch extension {
+	case "bash", "c", "cc", "cpp", "cs", "css", "go", "h", "hpp", "html", "java", "js", "json",
+		"jsx", "kt", "md", "py", "rb", "rs", "scss", "sh", "sql", "svelte", "swift", "toml", "ts",
+		"tsx", "vue", "yaml", "yml", "zsh":
+		return true
+	default:
+		return false
+	}
+}
+
+func filepathExtension(value string) string {
+	index := strings.LastIndex(value, ".")
+	if index < 0 {
+		return ""
+	}
+	return value[index:]
 }
 
 func replaceFold(text, target string) string {

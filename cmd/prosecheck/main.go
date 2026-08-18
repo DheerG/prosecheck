@@ -490,5 +490,6 @@ Examples:
   prosecheck check .git/COMMIT_EDITMSG
   git log -1 --format=%B | prosecheck check
 
-Run "prosecheck check -h" to list the check flags.`)
+Run "prosecheck check -h" to list the check flags.
+Run "prosecheck init -h" to list the setup flags.`)
 }

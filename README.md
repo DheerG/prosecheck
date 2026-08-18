@@ -19,6 +19,7 @@ prosecheck finds these common problems:
 - Bodies that start with file lists or implementation details
 - Bodies that narrate the commit process
 - Long lines and long sentences
+- Contractions, wordy phrases, and uncertain modal verbs
 - Context that will not make sense later
 
 ## Build prosecheck
@@ -41,6 +42,32 @@ You can also install the latest public version:
 ```sh
 go install github.com/DheerG/prosecheck/cmd/prosecheck@latest
 ```
+
+## Set up a repository
+
+Run the guided setup from any directory inside the Git repository:
+
+```sh
+prosecheck init
+```
+
+The setup explains the local rules, Git hook, and optional model. It asks before it writes files or downloads the model.
+
+Use the recommended choices without questions:
+
+```sh
+prosecheck init --yes
+```
+
+This choice enables Simple English and installs the Git hook. It does not install the optional model.
+
+Enable the model during an automated setup:
+
+```sh
+prosecheck init --yes --semantic on
+```
+
+Use `prosecheck init --advanced` to answer every feature question. The command never stages the new configuration in Git.
 
 ## Check a message
 
@@ -70,9 +97,9 @@ prosecheck check --strict --message "Updated code"
 
 If another program reads the result, use `--format json`.
 
-## Install the Git hook
+## Install only the Git hook
 
-Install the `prosecheck` binary once on each computer. Each repository needs its own policy file and hook entry.
+Use `prosecheck init` for a first setup. Use `install-hook` when the repository already has a configuration.
 
 The hook calls `prosecheck` from `PATH`. Run this command in the repository:
 
@@ -105,7 +132,7 @@ Read [Connect prosecheck to Git hooks](docs/hooks.md) for manager-specific examp
 
 ## Configuration
 
-Copy the example file into the project root:
+The guided setup creates `.prosecheck.json`. You can also copy the example file into the project root:
 
 ```sh
 cp .prosecheck.example.json .prosecheck.json
@@ -118,13 +145,33 @@ Each rule can use `error`, `warning`, `info`, or `off`.
 ```json
 {
   "rules": {
-    "PC014": "off",
+    "PC017": "info",
     "PC005": "error"
   }
 }
 ```
 
 The file merges with the default configuration. You only need to include values that you want to change.
+
+### Simple English
+
+Simple English is enabled by default. Its local rules find contractions, indirect phrases, uncertain modal verbs, and complex verb tenses.
+
+```json
+{
+  "simpleEnglish": {
+    "enabled": true,
+    "severity": "warning",
+    "allow": ["OAuth", "SAML", "webhook"]
+  }
+}
+```
+
+The `allow` list protects project terms that overlap a language rule. Code in backticks and quoted errors are also protected.
+
+The profile uses practical rules from Simplified Technical English. It does not claim full ASD-STE100 compliance.
+
+Read [Use Simple English](docs/simple-english.md) for the complete policy and examples.
 
 ## Add a local model review
 
@@ -141,7 +188,7 @@ The reviewer checks for these problems:
 
 Model findings are notes in this version. They do not block a commit, even when the hook uses strict mode.
 
-Install the supported Bonsai model once on each computer:
+The guided setup can install the model. You can also install it directly:
 
 ```sh
 prosecheck model install bonsai-8b
@@ -215,7 +262,12 @@ Read [Compare Bonsai 4B and 8B](docs/model-comparison.md) for raw benchmarks and
 | `PC011` | Body line exceeds the character limit | Warning |
 | `PC012` | Body sentence exceeds the word limit | Warning |
 | `PC013` | Body repeats the subject | Information |
-| `PC014` | Body contains a semicolon | Information |
+| `PC014` | Body contains a semicolon | Warning with Simple English |
+| `PC015` | Text contains a contraction | Warning |
+| `PC016` | Text contains a wordy or indirect phrase | Warning |
+| `PC017` | A modal verb makes the meaning uncertain | Warning |
+| `PC018` | Text contains a Latin abbreviation | Warning |
+| `PC019` | Text uses a complex verb tense | Warning |
 | `SEM001`–`SEM006` | Optional model findings | Information |
 
 Merge commits, revert commits, and autosquash subjects do not use these rules.

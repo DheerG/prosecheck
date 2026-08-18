@@ -36,7 +36,7 @@ func runInit(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	advanced := fs.Bool("advanced", false, "choose each feature")
 	repository := fs.String("repository", "", "set up this Git repository")
 	simpleEnglish := fs.String("simple-english", "", "Simple English rules: on or off")
-	semantic := fs.String("semantic", "", "private local model review: on or off")
+	semantic := fs.String("semantic", "", "private AI review on this computer: on or off")
 	installHook := fs.String("hook", "", "Git commit hook: on or off")
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -110,8 +110,6 @@ func runInit(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 
 	if !writeConfig {
 		fmt.Fprintln(stdout, "Kept the existing configuration.")
-		choices.simpleEnglish = cfg.SimpleEnglish.Enabled
-		choices.semantic = cfg.Semantic.Enabled
 	}
 
 	if choices.semantic {
@@ -124,7 +122,7 @@ func runInit(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		installed := manager.Status(ctx).Installed
 		cancel()
 		if !installed {
-			fmt.Fprintln(stdout, "Installing the private local model.")
+			fmt.Fprintln(stdout, "Installing the private AI reviewer.")
 			if installErr := manager.Install(context.Background(), "", func(message string) {
 				fmt.Fprintln(stdout, message)
 			}); installErr != nil {
@@ -132,7 +130,7 @@ func runInit(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 				return 2
 			}
 		} else {
-			fmt.Fprintln(stdout, "The private local model is already installed.")
+			fmt.Fprintln(stdout, "The private AI reviewer is already installed.")
 		}
 	}
 
@@ -184,7 +182,7 @@ func chooseInitOptions(reader answerReader, yes, advanced bool, simpleValue, sem
 
 	if !advanced && simpleValue == "" && hookValue == "" {
 		fmt.Fprintln(reader.output, "The recommended setup checks each commit and enforces Simple English.")
-		fmt.Fprintln(reader.output, "A local rule can stop a commit until you correct its message.")
+		fmt.Fprintln(reader.output, "A built-in rule can stop a commit until you correct its message.")
 		recommended, err := reader.ask("Use the recommended local rules and Git hook?", true)
 		if err != nil {
 			return choices, err
@@ -211,10 +209,10 @@ func chooseInitOptions(reader answerReader, yes, advanced bool, simpleValue, sem
 	applyToggle(&choices.hook, hookValue)
 
 	if semanticValue == "" {
-		fmt.Fprintln(reader.output, "The optional model runs on this computer and requires a large download.")
+		fmt.Fprintln(reader.output, "The optional AI reviewer runs on this computer and requires a large download.")
 		fmt.Fprintln(reader.output, "Its advice does not stop commits.")
 		var err error
-		choices.semantic, err = reader.ask("Install the private local model?", false)
+		choices.semantic, err = reader.ask("Install the private AI reviewer?", false)
 		if err != nil {
 			return choices, err
 		}
@@ -263,7 +261,7 @@ func applyToggle(target *bool, value string) {
 func writeInitSummary(output io.Writer, choices initChoices) {
 	fmt.Fprintln(output, "Selected setup:")
 	fmt.Fprintf(output, "  Simple English: %s\n", toggleLabel(choices.simpleEnglish))
-	fmt.Fprintf(output, "  Private local model: %s\n", toggleLabel(choices.semantic))
+	fmt.Fprintf(output, "  Private AI review: %s\n", toggleLabel(choices.semantic))
 	fmt.Fprintf(output, "  Git commit hook: %s\n", toggleLabel(choices.hook))
 }
 

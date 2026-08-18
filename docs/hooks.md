@@ -9,15 +9,23 @@ Each repository needs these two items:
 
 The repository files let a team share one policy. The local hook does not use GitHub Actions.
 
-## Let the installer select the setup
+## Set up a repository
 
 Run this command from the repository root:
+
+```sh
+prosecheck init
+```
+
+The guided setup creates the policy file and connects the hook. It also offers the optional private model.
+
+Use this command when the policy file already exists:
 
 ```sh
 prosecheck install-hook
 ```
 
-The installer detects plain Git, Husky, Lefthook, pre-commit, and Overcommit.
+Both commands detect plain Git, Husky, Lefthook, pre-commit, and Overcommit.
 
 ## Plain Git
 

@@ -107,13 +107,23 @@ func TestCheckAppliesSimpleEnglishRules(t *testing.T) {
 	cfg.SimpleEnglish.Enabled = true
 	message := `Keep retries available after a restart
 
-It is worth noting that workers shouldn't utilize stale retry state, e.g. after a deployment.`
+It is worth noting that workers shouldn't utilize stale retry state, e.g. after a deployment.
+The worker might lose records that have been saved.`
 
 	report := Check(message, cfg)
 	codes := findingCodes(report.Findings)
-	for _, expected := range []string{"PC015", "PC016", "PC018"} {
+	for _, expected := range []string{"PC015", "PC016", "PC017", "PC018", "PC019"} {
 		if !strings.Contains(codes, expected) {
 			t.Errorf("expected %s in %s", expected, codes)
+		}
+	}
+}
+
+func TestSimpleEnglishMakesSemicolonsWarnings(t *testing.T) {
+	report := Check("Keep retry state\n\nThe worker saves retries; deployments keep them.", config.Default())
+	for _, finding := range report.Findings {
+		if finding.Code == "PC014" && finding.Severity != SeverityWarning {
+			t.Fatalf("expected a semicolon warning, got %s", finding.Severity)
 		}
 	}
 }
@@ -131,7 +141,7 @@ func TestCheckProtectsTechnicalAndAllowedText(t *testing.T) {
 	cfg := config.Default()
 	cfg.SimpleEnglish.Enabled = true
 	cfg.SimpleEnglish.Allow = []string{"could"}
-	message := "Keep error details\n\nThe log contains `can't connect`. OAuth could return through SAML."
+	message := "Keep error details\n\nThe log contains `can't connect`. OAuth could return through SAML in src/might.go."
 
 	report := Check(message, cfg)
 	for _, finding := range report.Findings {
