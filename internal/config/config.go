@@ -14,10 +14,11 @@ import (
 const FileName = ".prosecheck.json"
 
 type Config struct {
-	Subject  SubjectConfig     `json:"subject"`
-	Body     BodyConfig        `json:"body"`
-	Rules    map[string]string `json:"rules"`
-	Semantic SemanticConfig    `json:"semantic"`
+	Subject       SubjectConfig       `json:"subject"`
+	Body          BodyConfig          `json:"body"`
+	Rules         map[string]string   `json:"rules"`
+	SimpleEnglish SimpleEnglishConfig `json:"simpleEnglish"`
+	Semantic      SemanticConfig      `json:"semantic"`
 }
 
 type SubjectConfig struct {
@@ -39,11 +40,20 @@ type SemanticConfig struct {
 	MaxDiffBytes int    `json:"maxDiffBytes"`
 }
 
+type SimpleEnglishConfig struct {
+	Enabled  bool     `json:"enabled"`
+	Severity string   `json:"severity"`
+	Allow    []string `json:"allow"`
+}
+
 func Default() Config {
 	return Config{
 		Subject: SubjectConfig{MaxLength: 72, MinLength: 10},
 		Body:    BodyConfig{MaxLineLength: 100, MaxSentenceWords: 25},
 		Rules:   map[string]string{},
+		SimpleEnglish: SimpleEnglishConfig{
+			Enabled: true, Severity: "warning", Allow: []string{},
+		},
 		Semantic: SemanticConfig{
 			Runtime: "managed", Model: "bonsai-8b",
 			Timeout: "20s", MaxDiffBytes: 12000,
@@ -102,14 +112,26 @@ func (c Config) Validate() error {
 	if c.Semantic.MaxDiffBytes < 0 {
 		return errors.New("semantic.maxDiffBytes cannot be less than zero")
 	}
+	if !validSeverity(c.SimpleEnglish.Severity, false) {
+		return errors.New("simpleEnglish.severity must be error, warning, or info")
+	}
 	for code, severity := range c.Rules {
-		switch strings.ToLower(severity) {
-		case "off", "error", "warning", "info":
-		default:
+		if !validSeverity(severity, true) {
 			return fmt.Errorf("rules.%s must be off, error, warning, or info", code)
 		}
 	}
 	return nil
+}
+
+func validSeverity(value string, allowOff bool) bool {
+	switch strings.ToLower(value) {
+	case "error", "warning", "info":
+		return true
+	case "off":
+		return allowOff
+	default:
+		return false
+	}
 }
 
 func discover() string {

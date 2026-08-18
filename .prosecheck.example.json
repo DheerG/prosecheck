@@ -7,8 +7,11 @@
     "maxLineLength": 100,
     "maxSentenceWords": 25
   },
-  "rules": {
-    "PC014": "off"
+  "rules": {},
+  "simpleEnglish": {
+    "enabled": true,
+    "severity": "warning",
+    "allow": ["OAuth", "SAML", "webhook"]
   },
   "semantic": {
     "enabled": false,

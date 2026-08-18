@@ -108,7 +108,11 @@ func Check(raw string, cfg config.Config) Report {
 				"Wrap the line at no more than "+itoa(cfg.Body.MaxLineLength)+" characters.", line.Number)
 		}
 		if strings.Contains(line.Text, ";") {
-			add("PC014", SeverityInfo, "A body line contains a semicolon.",
+			severity := SeverityInfo
+			if cfg.SimpleEnglish.Enabled {
+				severity = configuredSimpleEnglishSeverity(cfg.SimpleEnglish.Severity)
+			}
+			add("PC014", severity, "A body line contains a semicolon.",
 				"Use two sentences when the line contains two separate facts.", line.Number)
 		}
 	}
@@ -126,8 +130,26 @@ func Check(raw string, cfg config.Config) Report {
 			"Use the body for the reason, constraints, or context that the subject cannot contain.", paragraphLine)
 	}
 
+	if cfg.SimpleEnglish.Enabled {
+		severity := configuredSimpleEnglishSeverity(cfg.SimpleEnglish.Severity)
+		for _, issue := range simpleEnglishIssues(message, cfg.SimpleEnglish.Allow) {
+			add(issue.Code, severity, issue.Message, issue.Suggestion, issue.Line)
+		}
+	}
+
 	SortFindings(report.Findings)
 	return report
+}
+
+func configuredSimpleEnglishSeverity(value string) Severity {
+	switch strings.ToLower(value) {
+	case "error":
+		return SeverityError
+	case "info":
+		return SeverityInfo
+	default:
+		return SeverityWarning
+	}
 }
 
 func configuredSeverity(code string, fallback Severity, overrides map[string]string) (Severity, bool) {

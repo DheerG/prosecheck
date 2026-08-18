@@ -102,6 +102,66 @@ func TestCheckAppliesRuleOverride(t *testing.T) {
 	}
 }
 
+func TestCheckAppliesSimpleEnglishRules(t *testing.T) {
+	cfg := config.Default()
+	cfg.SimpleEnglish.Enabled = true
+	message := `Keep retries available after a restart
+
+It is worth noting that workers shouldn't utilize stale retry state, e.g. after a deployment.`
+
+	report := Check(message, cfg)
+	codes := findingCodes(report.Findings)
+	for _, expected := range []string{"PC015", "PC016", "PC018"} {
+		if !strings.Contains(codes, expected) {
+			t.Errorf("expected %s in %s", expected, codes)
+		}
+	}
+}
+
+func TestCheckSkipsSimpleEnglishRulesWhenDisabled(t *testing.T) {
+	cfg := config.Default()
+	cfg.SimpleEnglish.Enabled = false
+	report := Check("Keep retries available\n\nWorkers shouldn't utilize stale state.", cfg)
+	if strings.Contains(findingCodes(report.Findings), "PC015") || strings.Contains(findingCodes(report.Findings), "PC016") {
+		t.Fatalf("expected the Simple English profile to stay off, got %#v", report.Findings)
+	}
+}
+
+func TestCheckProtectsTechnicalAndAllowedText(t *testing.T) {
+	cfg := config.Default()
+	cfg.SimpleEnglish.Enabled = true
+	cfg.SimpleEnglish.Allow = []string{"could"}
+	message := "Keep error details\n\nThe log contains `can't connect`. OAuth could return through SAML."
+
+	report := Check(message, cfg)
+	for _, finding := range report.Findings {
+		if finding.Code == "PC015" || finding.Code == "PC017" {
+			t.Fatalf("expected protected text to pass, got %#v", report.Findings)
+		}
+	}
+}
+
+func TestSimpleEnglishSeverityAndRuleOverride(t *testing.T) {
+	cfg := config.Default()
+	cfg.SimpleEnglish.Enabled = true
+	cfg.SimpleEnglish.Severity = "error"
+	cfg.Rules["PC015"] = "info"
+
+	report := Check("Keep retries available\n\nWorkers shouldn't utilize stale state.", cfg)
+	for _, finding := range report.Findings {
+		switch finding.Code {
+		case "PC015":
+			if finding.Severity != SeverityInfo {
+				t.Fatalf("expected the rule override, got %s", finding.Severity)
+			}
+		case "PC016":
+			if finding.Severity != SeverityError {
+				t.Fatalf("expected the profile severity, got %s", finding.Severity)
+			}
+		}
+	}
+}
+
 func TestParseIgnoresGitComments(t *testing.T) {
 	message := Parse("\nKeep cache keys stable\n\nThe old keys remain readable.\n# Please enter the commit message\n")
 	if message.Subject != "Keep cache keys stable" {
