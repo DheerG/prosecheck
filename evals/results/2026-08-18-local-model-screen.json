@@ -1,0 +1,104 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-08-18",
+  "hardware": {
+    "chip": "Apple M1 Pro",
+    "memoryBytes": 34359738368,
+    "backend": "Metal"
+  },
+  "runtime": {
+    "name": "Prism llama.cpp",
+    "version": "prism-b9599-9ca265a"
+  },
+  "semanticEval": {
+    "suiteVersion": 1,
+    "caseCount": 30,
+    "expectedFindings": 27,
+    "clearCaseCount": 8,
+    "temperature": 0,
+    "finalists": {
+      "ministral-3-8b-q4-k-m": {
+        "source": "mistralai/Ministral-3-8B-Instruct-2512-GGUF",
+        "revision": "0102285ad796bd99af90f58de616092e5630e970",
+        "file": "Ministral-3-8B-Instruct-2512-Q4_K_M.gguf",
+        "fileBytes": 5198911904,
+        "sha256": "33e7a72cf5e6e2cfc2f2847075acc013d68bba023e35310cef86b5cf8fdca761",
+        "repetitions": 3,
+        "precision": 0.68,
+        "recall": 0.63,
+        "f1": 0.654,
+        "exactMatchRate": 0.467,
+        "clearFalsePositiveRate": 0.125,
+        "protocolErrors": 0,
+        "consistencyRate": 1,
+        "meanLatencyMs": 2217,
+        "p50LatencyMs": 2452,
+        "p95LatencyMs": 4754,
+        "codes": {
+          "SEM001": {"f1": 0.909},
+          "SEM002": {"f1": 0},
+          "SEM003": {"f1": 0.889},
+          "SEM004": {"f1": 0},
+          "SEM005": {"f1": 0.571},
+          "SEM006": {"f1": 0.667}
+        }
+      },
+      "qwen-3.5-4b-q4-k-m": {
+        "fileBytes": 2740937888,
+        "repetitions": 3,
+        "precision": 0.476,
+        "recall": 0.37,
+        "f1": 0.417,
+        "exactMatchRate": 0.4,
+        "clearFalsePositiveRate": 0.375,
+        "protocolErrors": 0,
+        "consistencyRate": 1,
+        "meanLatencyMs": 1289,
+        "p50LatencyMs": 1690,
+        "p95LatencyMs": 2104
+      },
+      "ministral-3-3b-q4-k-m": {
+        "fileBytes": 2147023008,
+        "repetitions": 3,
+        "precision": 0.444,
+        "recall": 0.148,
+        "f1": 0.222,
+        "exactMatchRate": 0.3,
+        "clearFalsePositiveRate": 0.25,
+        "protocolErrors": 3,
+        "consistencyRate": 1,
+        "meanLatencyMs": 518,
+        "p50LatencyMs": 194,
+        "p95LatencyMs": 1510
+      },
+      "ministral-3-8b-q2-k": {
+        "source": "DevQuasar/mistralai.Ministral-3-8B-Instruct-2512-GGUF",
+        "revision": "311fae7ba2fce26f7af16cd61cd62335ffe3a94a",
+        "file": "mistralai.Ministral-3-8B-Instruct-2512.Q2_K.gguf",
+        "fileBytes": 3353451904,
+        "repetitions": 3,
+        "precision": 0,
+        "recall": 0,
+        "f1": 0,
+        "exactMatchRate": 0.233,
+        "clearFalsePositiveRate": 0.125,
+        "protocolErrors": 0,
+        "consistencyRate": 1,
+        "meanLatencyMs": 580,
+        "p50LatencyMs": 434,
+        "p95LatencyMs": 592
+      }
+    },
+    "screenedOnce": {
+      "lfm-2.5-1.2b-q8": {"f1": 0.277, "clearFalsePositiveRate": 1, "meanLatencyMs": 1035},
+      "phi-4-mini-3.8b-q4": {"f1": 0.286, "clearFalsePositiveRate": 0.625, "meanLatencyMs": 870},
+      "qwen-3-4b-instruct-2507-q4": {"f1": 0.434, "clearFalsePositiveRate": 0.875, "meanLatencyMs": 2835},
+      "qwen-3-1.7b-q8": {"f1": 0, "clearFalsePositiveRate": 0.25, "meanLatencyMs": 202},
+      "qwen-3.5-0.8b-q8": {"f1": 0.118, "clearFalsePositiveRate": 0.25, "meanLatencyMs": 421},
+      "qwen-3.5-2b-q4": {"f1": 0.255, "clearFalsePositiveRate": 0.5, "protocolErrors": 16, "meanLatencyMs": 876},
+      "qwen-3.5-9b-q4": {"f1": 0.492, "clearFalsePositiveRate": 0.625, "meanLatencyMs": 3379},
+      "smollm3-3b-q4": {"f1": 0.328, "clearFalsePositiveRate": 1, "meanLatencyMs": 933},
+      "granite-4.0-1b-q8": {"completed": false, "reason": "Review time was too long for a commit hook."}
+    }
+  }
+}

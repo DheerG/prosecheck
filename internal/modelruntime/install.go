@@ -38,40 +38,40 @@ func (m *Manager) Install(ctx context.Context, modelFile string, progress Instal
 	}
 	server, serverErr := findServer(m.paths.Runtime, asset.ServerExe)
 	if serverErr != nil {
-		progress("Downloading the Prism model runtime...")
+		progress("Downloading the local model runtime...")
 		if err := m.installRuntime(ctx, asset); err != nil {
 			return err
 		}
 		server, serverErr = findServer(m.paths.Runtime, asset.ServerExe)
 	}
 	if serverErr != nil {
-		return fmt.Errorf("the Prism runtime does not contain %s", asset.ServerExe)
+		return fmt.Errorf("the local model runtime does not contain %s", asset.ServerExe)
 	}
 	_ = server
 
 	if validFile(m.paths.Model, ModelSHA256) {
-		progress("The Bonsai model is already installed.")
+		progress("The Ministral model is already installed.")
 		return nil
 	}
 	if modelFile != "" {
-		progress("Importing the Bonsai model...")
+		progress("Importing the Ministral model...")
 		if err := copyVerified(modelFile, m.paths.Model, ModelSHA256); err != nil {
-			return fmt.Errorf("cannot import the Bonsai model: %w", err)
+			return fmt.Errorf("cannot import the Ministral model: %w", err)
 		}
 	} else {
-		progress("Downloading the Bonsai model (1.16 GB)...")
+		progress("Downloading the Ministral model (5.20 GB)...")
 		if err := m.downloadVerified(ctx, modelDownloadURL, m.paths.Model, ModelSHA256); err != nil {
-			return fmt.Errorf("cannot download the Bonsai model: %w", err)
+			return fmt.Errorf("cannot download the Ministral model: %w", err)
 		}
 	}
-	progress("Installed Bonsai 8B and the Prism runtime.")
+	progress("Installed Ministral 3 8B and the local model runtime.")
 	return nil
 }
 
 func (m *Manager) installRuntime(ctx context.Context, asset runtimeAsset) error {
 	archivePath := filepath.Join(m.paths.Root, "downloads", "prism-runtime."+strings.ReplaceAll(asset.Archive, ".", "-"))
 	if err := m.downloadVerified(ctx, asset.URL, archivePath, asset.SHA256); err != nil {
-		return fmt.Errorf("cannot download the Prism runtime: %w", err)
+		return fmt.Errorf("cannot download the local model runtime: %w", err)
 	}
 	stage := m.paths.Runtime + ".partial"
 	if err := os.RemoveAll(stage); err != nil {
@@ -91,7 +91,7 @@ func (m *Manager) installRuntime(ctx context.Context, asset runtimeAsset) error 
 	}
 	if err != nil {
 		_ = os.RemoveAll(stage)
-		return fmt.Errorf("cannot unpack the Prism runtime: %w", err)
+		return fmt.Errorf("cannot unpack the local model runtime: %w", err)
 	}
 	if err := os.RemoveAll(m.paths.Runtime); err != nil {
 		return err

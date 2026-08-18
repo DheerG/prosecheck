@@ -27,13 +27,13 @@ func TestLoadMergesFileWithDefaults(t *testing.T) {
 	if cfg.Subject.MaxLength != 60 || cfg.Subject.MinLength != 10 {
 		t.Fatalf("defaults were not merged: %#v", cfg.Subject)
 	}
-	if cfg.Semantic.Model != "bonsai-8b" || cfg.Semantic.Timeout != "20s" {
+	if cfg.Semantic.Model != "ministral-3-8b" || cfg.Semantic.Timeout != "20s" {
 		t.Fatalf("semantic defaults were not merged: %#v", cfg.Semantic)
 	}
 	if cfg.Semantic.Runtime != "managed" {
 		t.Fatalf("expected the managed runtime, got %q", cfg.Semantic.Runtime)
 	}
-	if !cfg.SimpleEnglish.Enabled || cfg.SimpleEnglish.Mode != SimpleEnglishPragmatic || cfg.SimpleEnglish.Severity != "warning" {
+	if !cfg.SimpleEnglish.Enabled || cfg.SimpleEnglish.Mode != SimpleEnglishStrict || cfg.SimpleEnglish.Severity != "warning" {
 		t.Fatalf("simple English defaults were not merged: %#v", cfg.SimpleEnglish)
 	}
 }

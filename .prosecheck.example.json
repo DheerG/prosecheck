@@ -10,14 +10,14 @@
   "rules": {},
   "simpleEnglish": {
     "enabled": true,
-    "mode": "pragmatic",
+    "mode": "strict",
     "severity": "warning",
     "allow": ["OAuth", "SAML", "webhook"]
   },
   "semantic": {
     "enabled": false,
     "runtime": "managed",
-    "model": "bonsai-8b",
+    "model": "ministral-3-8b",
     "timeout": "20s",
     "maxDiffBytes": 12000
   }

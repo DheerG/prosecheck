@@ -93,7 +93,7 @@ func (m *Manager) Start(ctx context.Context, preferredPort int) (State, error) {
 		return status.State, nil
 	}
 	if !m.installed() {
-		return State{}, errors.New("the managed model is not installed; run `prosecheck model install bonsai-8b`")
+		return State{}, fmt.Errorf("the managed model is not installed; run `prosecheck model install %s`", ModelName)
 	}
 	if err := os.MkdirAll(m.paths.Root, 0o700); err != nil {
 		return State{}, err
@@ -113,7 +113,7 @@ func (m *Manager) Start(ctx context.Context, preferredPort int) (State, error) {
 	}
 	server, err := findServer(m.paths.Runtime, asset.ServerExe)
 	if err != nil {
-		return State{}, errors.New("the Prism runtime is incomplete; run `prosecheck model install bonsai-8b`")
+		return State{}, fmt.Errorf("the local model runtime is incomplete; run `prosecheck model install %s`", ModelName)
 	}
 	port, err := availablePort(preferredPort)
 	if err != nil {
@@ -131,6 +131,8 @@ func (m *Manager) Start(ctx context.Context, preferredPort int) (State, error) {
 		"--alias", ModelName,
 		"--ctx-size", strconv.Itoa(defaultContext),
 		"--gpu-layers", "99",
+		"--reasoning", "off",
+		"--no-mmproj",
 		"--no-ui",
 	)
 	command.Stdout = logFile
@@ -138,13 +140,13 @@ func (m *Manager) Start(ctx context.Context, preferredPort int) (State, error) {
 	configureCommand(command)
 	if err := command.Start(); err != nil {
 		_ = logFile.Close()
-		return State{}, fmt.Errorf("cannot start the Prism runtime: %w", err)
+		return State{}, fmt.Errorf("cannot start the local model runtime: %w", err)
 	}
 	pid := command.Process.Pid
 	_ = logFile.Close()
 	if err := command.Process.Release(); err != nil {
 		_ = command.Process.Kill()
-		return State{}, fmt.Errorf("cannot detach the Prism runtime: %w", err)
+		return State{}, fmt.Errorf("cannot detach the local model runtime: %w", err)
 	}
 	state := State{
 		PID: pid, Port: port, Endpoint: endpoint, Model: ModelName,

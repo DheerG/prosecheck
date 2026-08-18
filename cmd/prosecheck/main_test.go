@@ -23,14 +23,37 @@ func TestRunCheckPassesClearMessage(t *testing.T) {
 	}
 }
 
-func TestRunCheckStrictFailsOnWarning(t *testing.T) {
+func TestRunCheckFailsOnWarningByDefault(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	exitCode := run([]string{"check", "--strict", "--message", "Updated account validation"}, strings.NewReader(""), &stdout, &stderr)
+	exitCode := run([]string{"check", "--message", "Updated account validation"}, strings.NewReader(""), &stdout, &stderr)
 	if exitCode != 1 {
 		t.Fatalf("expected exit code 1, got %d: %s", exitCode, stderr.String())
 	}
 	if !strings.Contains(stdout.String(), "PC007") {
 		t.Fatalf("unexpected output %q", stdout.String())
+	}
+}
+
+func TestRunCheckCanAllowWarnings(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	exitCode := run([]string{"check", "--strict=false", "--message", "Updated account validation"}, strings.NewReader(""), &stdout, &stderr)
+	if exitCode != 0 {
+		t.Fatalf("expected exit code 0, got %d: %s", exitCode, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "PC007") {
+		t.Fatalf("unexpected output %q", stdout.String())
+	}
+}
+
+func TestRunCheckHonorsBypassEnvironment(t *testing.T) {
+	t.Setenv("PROSECHECK_BYPASS", "1")
+	var stdout, stderr bytes.Buffer
+	exitCode := run([]string{"check", "--message", "WIP"}, strings.NewReader(""), &stdout, &stderr)
+	if exitCode != 0 {
+		t.Fatalf("expected exit code 0, got %d", exitCode)
+	}
+	if stdout.Len() != 0 || !strings.Contains(stderr.String(), "PROSECHECK_BYPASS=1") {
+		t.Fatalf("unexpected output: stdout=%q stderr=%q", stdout.String(), stderr.String())
 	}
 }
 
@@ -75,7 +98,7 @@ func TestRunModelInstallRejectsUnknownModel(t *testing.T) {
 	if exitCode != 2 {
 		t.Fatalf("expected exit code 2, got %d", exitCode)
 	}
-	if !strings.Contains(stderr.String(), "supported model is bonsai-8b") {
+	if !strings.Contains(stderr.String(), "supported model is ministral-3-8b") {
 		t.Fatalf("unexpected error %q", stderr.String())
 	}
 }
@@ -132,7 +155,7 @@ func TestRunInitCreatesRecommendedConfigurationAndHook(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !cfg.SimpleEnglish.Enabled || cfg.SimpleEnglish.Mode != config.SimpleEnglishPragmatic || cfg.Semantic.Enabled {
+	if !cfg.SimpleEnglish.Enabled || cfg.SimpleEnglish.Mode != config.SimpleEnglishStrict || cfg.Semantic.Enabled {
 		t.Fatalf("unexpected configuration: %#v", cfg)
 	}
 	hookPath := filepath.Join(repository, ".git", "hooks", "commit-msg")
@@ -151,7 +174,7 @@ func TestChooseInitOptionsUsesInteractiveDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if choices.simpleEnglishMode != config.SimpleEnglishPragmatic || choices.semantic || !choices.hook {
+	if choices.simpleEnglishMode != config.SimpleEnglishStrict || choices.semantic || !choices.hook {
 		t.Fatalf("unexpected choices: %#v", choices)
 	}
 	if !strings.Contains(output.String(), "large download") {
@@ -177,18 +200,18 @@ func TestSimpleEnglishModeRejectsOldOnValue(t *testing.T) {
 	}
 }
 
-func TestChooseInitOptionsExplainsStrictMode(t *testing.T) {
+func TestChooseInitOptionsOffersPragmaticMode(t *testing.T) {
 	var output bytes.Buffer
 	reader := answerReader{scanner: bufio.NewScanner(strings.NewReader("\ny\nn\nn\n")), output: &output}
 	choices, err := chooseInitOptions(reader, false, true, "", "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if choices.simpleEnglishMode != config.SimpleEnglishStrict || choices.semantic || choices.hook {
+	if choices.simpleEnglishMode != config.SimpleEnglishPragmatic || choices.semantic || choices.hook {
 		t.Fatalf("unexpected choices: %#v", choices)
 	}
-	if !strings.Contains(output.String(), "Strict mode") {
-		t.Fatalf("expected a strict mode explanation, got %q", output.String())
+	if !strings.Contains(output.String(), "Pragmatic mode") {
+		t.Fatalf("expected a pragmatic mode explanation, got %q", output.String())
 	}
 }
 

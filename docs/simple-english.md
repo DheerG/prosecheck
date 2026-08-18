@@ -1,6 +1,6 @@
 # Use Simple English
 
-The Simple English profile keeps commit messages direct and easy to scan. Pragmatic mode is enabled by default.
+The Simple English profile keeps commit messages direct and easy to scan. Strict mode is enabled by default.
 
 A commit subject is an instruction, such as `Prevent duplicate invoice delivery`. The body describes the reason and important facts.
 
@@ -12,7 +12,7 @@ Add this section to `.prosecheck.json`:
 {
   "simpleEnglish": {
     "enabled": true,
-    "mode": "pragmatic",
+    "mode": "strict",
     "severity": "warning",
     "allow": ["OAuth", "SAML", "webhook"]
   }
@@ -58,9 +58,9 @@ The profile adds these checks:
 | `PC014` | Semicolon | Write two sentences. |
 | `PC015` | Contraction | Replace `doesn't` with `does not`. |
 | `PC016` | Wordy phrase | Replace `in order to` with `to`. |
-| `PC017` | Uncertain modal verb | Replace `might` with `can`, or state the condition. Pragmatic mode reports a note. |
+| `PC017` | Uncertain modal verb | Replace `might` with `can`, or state the condition. |
 | `PC018` | Latin abbreviation | Replace `e.g.` with `for example`. |
-| `PC019` | Complex verb tense | Replace `has been removed` with a simple form. Pragmatic mode reports a note. |
+| `PC019` | Complex verb tense | Replace `has been removed` with a simple form. |
 
 The existing body limit keeps each descriptive sentence at 25 words or fewer.
 

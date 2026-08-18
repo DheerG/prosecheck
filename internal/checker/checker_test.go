@@ -174,6 +174,7 @@ func TestSimpleEnglishSeverityAndRuleOverride(t *testing.T) {
 
 func TestPragmaticSimpleEnglishKeepsContextRulesAsNotes(t *testing.T) {
 	cfg := config.Default()
+	cfg.SimpleEnglish.Mode = config.SimpleEnglishPragmatic
 	report := Check("Keep retry state\n\nThe worker might lose records that have been saved.", cfg)
 
 	found := 0

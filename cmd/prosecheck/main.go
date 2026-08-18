@@ -62,7 +62,7 @@ func runCheck(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	configPath := fs.String("config", "", "read configuration from this file")
 	format := fs.String("format", "text", "output format: text or json")
 	semanticMode := fs.String("semantic", "auto", "local model use: auto, on, or off")
-	strict := fs.Bool("strict", false, "return an error for warnings")
+	strict := fs.Bool("strict", true, "return an error for warnings; use --strict=false to allow them")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -81,6 +81,10 @@ func runCheck(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if *semanticMode != "auto" && *semanticMode != "on" && *semanticMode != "off" {
 		fmt.Fprintln(stderr, "The --semantic value must be auto, on, or off.")
 		return 2
+	}
+	if os.Getenv("PROSECHECK_BYPASS") == "1" {
+		fmt.Fprintln(stderr, "Prosecheck skipped because PROSECHECK_BYPASS=1.")
+		return 0
 	}
 
 	message, err := readMessage(*messageText, fs.Args(), stdin)
@@ -371,7 +375,7 @@ func runModelStart(manager *modelruntime.Manager, args []string, stdout, stderr 
 		fmt.Fprintf(stderr, "Cannot start the model: %v\n", err)
 		return 2
 	}
-	fmt.Fprintf(stdout, "Bonsai is ready at %s.\n", state.Endpoint)
+	fmt.Fprintf(stdout, "Ministral is ready at %s.\n", state.Endpoint)
 	return 0
 }
 
@@ -384,15 +388,15 @@ func runModelStatus(manager *modelruntime.Manager, args []string, stdout, stderr
 	defer cancel()
 	status := manager.Status(ctx)
 	if !status.Installed {
-		fmt.Fprintln(stdout, "Bonsai is not installed.")
+		fmt.Fprintln(stdout, "Ministral is not installed.")
 		fmt.Fprintf(stdout, "Run `prosecheck model install %s`.\n", modelruntime.ModelName)
 		return 1
 	}
 	if !status.Running {
-		fmt.Fprintln(stdout, "Bonsai is installed but stopped.")
+		fmt.Fprintln(stdout, "Ministral is installed but stopped.")
 		return 1
 	}
-	fmt.Fprintf(stdout, "Bonsai is running at %s.\n", status.State.Endpoint)
+	fmt.Fprintf(stdout, "Ministral is running at %s.\n", status.State.Endpoint)
 	return 0
 }
 
@@ -419,7 +423,7 @@ func runModelDoctor(manager *modelruntime.Manager, args []string, stdout, stderr
 		fmt.Fprintf(stderr, "The model server started but could not complete a review: %v\n", err)
 		return 2
 	}
-	fmt.Fprintf(stdout, "Bonsai completed a test review at %s.\n", state.Endpoint)
+	fmt.Fprintf(stdout, "Ministral completed a test review at %s.\n", state.Endpoint)
 	return 0
 }
 
@@ -458,15 +462,15 @@ func runModelStop(manager *modelruntime.Manager, args []string, stdout, stderr i
 		fmt.Fprintf(stderr, "Cannot stop the model: %v\n", err)
 		return 2
 	}
-	fmt.Fprintln(stdout, "Bonsai is stopped.")
+	fmt.Fprintln(stdout, "Ministral is stopped.")
 	return 0
 }
 
 func writeModelUsage(w io.Writer) {
-	fmt.Fprintln(w, `prosecheck manages a private Bonsai model server.
+	fmt.Fprintln(w, `prosecheck manages a private Ministral model server.
 
 Usage:
-  prosecheck model install [--model-file path] [bonsai-8b]
+  prosecheck model install [--model-file path] [ministral-3-8b]
   prosecheck model start [--port number]
   prosecheck model status
   prosecheck model doctor

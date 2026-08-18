@@ -6,15 +6,15 @@ import (
 )
 
 const (
-	ModelName        = "bonsai-8b"
-	ModelFileName    = "Bonsai-8B-Q1_0.gguf"
-	ModelSHA256      = "284a335aa3fb2ced3b1b01fcb40b08aa783e3b70832767f0dd2e3fdfa134bd54"
-	ModelSize        = int64(1158654496)
-	ModelRevision    = "48516770dd04643643e9f9019a2a349cf26c5dbd"
+	ModelName        = "ministral-3-8b"
+	ModelFileName    = "Ministral-3-8B-Instruct-2512-Q4_K_M.gguf"
+	ModelSHA256      = "33e7a72cf5e6e2cfc2f2847075acc013d68bba023e35310cef86b5cf8fdca761"
+	ModelSize        = int64(5198911904)
+	ModelRevision    = "0102285ad796bd99af90f58de616092e5630e970"
 	RuntimeVersion   = "prism-b9599-9ca265a"
 	DefaultPort      = 11435
 	defaultContext   = 8192
-	modelDownloadURL = "https://huggingface.co/prism-ml/Bonsai-8B-gguf/resolve/" + ModelRevision + "/" + ModelFileName + "?download=true"
+	modelDownloadURL = "https://huggingface.co/mistralai/Ministral-3-8B-Instruct-2512-GGUF/resolve/" + ModelRevision + "/" + ModelFileName + "?download=true"
 )
 
 type runtimeAsset struct {

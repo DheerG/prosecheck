@@ -178,7 +178,7 @@ func runInit(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 }
 
 func chooseInitOptions(reader answerReader, yes, advanced bool, simpleValue, semanticValue, hookValue string) (initChoices, error) {
-	choices := initChoices{simpleEnglishMode: config.SimpleEnglishPragmatic, semantic: false, hook: true}
+	choices := initChoices{simpleEnglishMode: config.SimpleEnglishStrict, semantic: false, hook: true}
 	if yes {
 		applySimpleEnglishMode(&choices.simpleEnglishMode, simpleValue)
 		applyToggle(&choices.semantic, semanticValue)
@@ -187,7 +187,7 @@ func chooseInitOptions(reader answerReader, yes, advanced bool, simpleValue, sem
 	}
 
 	if !advanced && simpleValue == "" && hookValue == "" {
-		fmt.Fprintln(reader.output, "The recommended setup checks each commit and uses pragmatic Simple English.")
+		fmt.Fprintln(reader.output, "The recommended setup checks each commit and uses strict Simple English.")
 		fmt.Fprintln(reader.output, "A built-in rule can stop a commit until you correct its message.")
 		recommended, err := reader.ask("Use the recommended local rules and Git hook?", true)
 		if err != nil {
@@ -198,7 +198,7 @@ func chooseInitOptions(reader answerReader, yes, advanced bool, simpleValue, sem
 	if advanced {
 		var err error
 		if simpleValue == "" {
-			fmt.Fprintln(reader.output, "Pragmatic mode blocks clear problems and reports uncertain grammar as notes.")
+			fmt.Fprintln(reader.output, "Strict mode applies the configured severity to every Simple English rule.")
 			enabled, askErr := reader.ask("Use Simple English?", true)
 			if askErr != nil {
 				return choices, askErr
@@ -206,13 +206,13 @@ func chooseInitOptions(reader answerReader, yes, advanced bool, simpleValue, sem
 			if !enabled {
 				choices.simpleEnglishMode = "off"
 			} else {
-				fmt.Fprintln(reader.output, "Strict mode also blocks modal verbs and complex verb tenses.")
-				strict, strictErr := reader.ask("Use strict Simple English?", false)
-				if strictErr != nil {
-					return choices, strictErr
+				fmt.Fprintln(reader.output, "Pragmatic mode reports modal verbs and complex verb tenses as notes.")
+				pragmatic, pragmaticErr := reader.ask("Use pragmatic Simple English instead?", false)
+				if pragmaticErr != nil {
+					return choices, pragmaticErr
 				}
-				if strict {
-					choices.simpleEnglishMode = config.SimpleEnglishStrict
+				if pragmatic {
+					choices.simpleEnglishMode = config.SimpleEnglishPragmatic
 				}
 			}
 		}

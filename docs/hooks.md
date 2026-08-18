@@ -9,6 +9,14 @@ Each repository needs these two items:
 
 The repository files let a team share one policy. The local hook does not use GitHub Actions.
 
+The check treats warnings as failures. To bypass one commit, set `PROSECHECK_BYPASS=1` for that command:
+
+```sh
+PROSECHECK_BYPASS=1 git commit
+```
+
+Prosecheck prints a notice when it skips the check.
+
 ## Set up a repository
 
 Run this command from the repository root:

@@ -59,7 +59,7 @@ Use the recommended choices without questions:
 prosecheck init --yes
 ```
 
-This choice enables pragmatic Simple English and installs the Git hook. It does not install the optional model.
+This choice enables strict Simple English and installs the Git hook. It does not install the optional model.
 
 Enable the model during an automated setup:
 
@@ -69,10 +69,10 @@ prosecheck init --yes --semantic on
 
 Use `prosecheck init --advanced` to answer every feature question. The command never stages the new configuration in Git.
 
-Select strict Simple English without questions:
+Select pragmatic Simple English without questions:
 
 ```sh
-prosecheck init --yes --simple-english strict
+prosecheck init --yes --simple-english pragmatic
 ```
 
 ## Check a message
@@ -95,10 +95,10 @@ Pass a message through standard input:
 git log -1 --format=%B | prosecheck check
 ```
 
-Warnings do not cause an error by default. Add `--strict` to return an error for warnings.
+Warnings cause an error by default. Allow warnings for one manual check with `--strict=false`.
 
 ```sh
-prosecheck check --strict --message "Updated code"
+prosecheck check --strict=false --message "Updated code"
 ```
 
 If another program reads the result, use `--format json`.
@@ -113,7 +113,15 @@ The hook calls `prosecheck` from `PATH`. Run this command in the repository:
 prosecheck install-hook
 ```
 
-The hook uses strict mode for local rules. It blocks a commit when a rule reports an error or warning.
+The hook blocks a commit when a local rule reports an error or warning.
+
+Bypass the check only when you cannot correct the message:
+
+```sh
+PROSECHECK_BYPASS=1 git commit
+```
+
+Prosecheck prints a notice when it skips the check. The variable applies to one command unless you export it.
 
 The installer uses these rules:
 
@@ -161,7 +169,7 @@ The file merges with the default configuration. You only need to include values 
 
 ### Simple English
 
-Simple English is enabled by default in pragmatic mode. Its local rules find contractions, indirect phrases, modal verbs, and complex tenses.
+Simple English is enabled by default in strict mode. Its local rules find contractions, indirect phrases, modal verbs, and complex tenses.
 
 Pragmatic mode blocks high-confidence findings. It reports modal verbs and complex tenses as notes.
 
@@ -171,7 +179,7 @@ Strict mode applies the configured severity to every Simple English rule.
 {
   "simpleEnglish": {
     "enabled": true,
-    "mode": "pragmatic",
+    "mode": "strict",
     "severity": "warning",
     "allow": ["OAuth", "SAML", "webhook"]
   }
@@ -202,10 +210,10 @@ Model findings are notes in this version. They do not block a commit, even when 
 The guided setup can install the model. You can also install it directly:
 
 ```sh
-prosecheck model install bonsai-8b
+prosecheck model install ministral-3-8b
 ```
 
-This command downloads a pinned Prism runtime and a 1.16 GB model file. It verifies both files before installation.
+This command downloads a pinned local runtime and a 5.20 GB model file. It verifies both files before installation.
 
 Enable the reviewer in `.prosecheck.json`:
 
@@ -214,7 +222,7 @@ Enable the reviewer in `.prosecheck.json`:
   "semantic": {
     "enabled": true,
     "runtime": "managed",
-    "model": "bonsai-8b",
+    "model": "ministral-3-8b",
     "timeout": "20s",
     "maxDiffBytes": 12000
   }
@@ -244,9 +252,9 @@ prosecheck check --semantic on --message "Explain the durable outcome"
 
 Use `--semantic off` to skip a reviewer that the configuration enables.
 
-Read [Run Bonsai locally](docs/bonsai.md) for storage details, file imports, and an external-server setup.
+Read [Run the local model](docs/local-model.md) for storage details, file imports, and an external-server setup.
 
-Read [Compare Bonsai 4B and 8B](docs/model-comparison.md) for raw benchmarks and the synthetic semantic-review eval.
+Read [Compare local models](docs/model-comparison.md) for the synthetic semantic-review eval and the model choice.
 
 ## Exit codes
 
@@ -276,9 +284,9 @@ Read [Compare Bonsai 4B and 8B](docs/model-comparison.md) for raw benchmarks and
 | `PC014` | Body contains a semicolon | Warning with Simple English |
 | `PC015` | Text contains a contraction | Warning |
 | `PC016` | Text contains a wordy or indirect phrase | Warning |
-| `PC017` | A modal verb makes the meaning uncertain | Note in pragmatic mode |
+| `PC017` | A modal verb makes the meaning uncertain | Warning |
 | `PC018` | Text contains a Latin abbreviation | Warning |
-| `PC019` | Text uses a complex verb tense | Note in pragmatic mode |
+| `PC019` | Text uses a complex verb tense | Warning |
 | `SEM001`–`SEM006` | Optional model findings | Information |
 
 Merge commits, revert commits, and autosquash subjects do not use these rules.

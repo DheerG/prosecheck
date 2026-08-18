@@ -92,10 +92,10 @@ func Default() Config {
 		Body:    BodyConfig{MaxLineLength: 100, MaxSentenceWords: 25},
 		Rules:   map[string]string{},
 		SimpleEnglish: SimpleEnglishConfig{
-			Enabled: true, Mode: SimpleEnglishPragmatic, Severity: "warning", Allow: []string{},
+			Enabled: true, Mode: SimpleEnglishStrict, Severity: "warning", Allow: []string{},
 		},
 		Semantic: SemanticConfig{
-			Runtime: "managed", Model: "bonsai-8b",
+			Runtime: "managed", Model: "ministral-3-8b",
 			Timeout: "20s", MaxDiffBytes: 12000,
 		},
 	}
@@ -136,8 +136,8 @@ func (c Config) Validate() error {
 	}
 	switch c.Semantic.Runtime {
 	case "managed":
-		if c.Semantic.Model != "bonsai-8b" {
-			return errors.New("semantic.model must be bonsai-8b when semantic.runtime is managed")
+		if c.Semantic.Model != "ministral-3-8b" {
+			return errors.New("semantic.model must be ministral-3-8b when semantic.runtime is managed")
 		}
 	case "external":
 		if c.Semantic.Endpoint == "" {
