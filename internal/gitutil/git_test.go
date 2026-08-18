@@ -52,6 +52,27 @@ func TestStagedDiffDisabled(t *testing.T) {
 	}
 }
 
+func TestRootFindsTheRepositoryFromAChildDirectory(t *testing.T) {
+	repository := t.TempDir()
+	runGit(t, repository, "init", "--quiet")
+	child := filepath.Join(repository, "nested", "directory")
+	if err := os.MkdirAll(child, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	root, err := Root(child)
+	if err != nil {
+		t.Fatal(err)
+	}
+	realRepository, err := filepath.EvalSymlinks(repository)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if root != realRepository {
+		t.Fatalf("expected %q, got %q", realRepository, root)
+	}
+}
+
 func runGit(t *testing.T, directory string, args ...string) {
 	t.Helper()
 	command := exec.Command("git", args...)

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -96,5 +97,27 @@ func TestValidateRejectsBadSimpleEnglishSeverity(t *testing.T) {
 	cfg.SimpleEnglish.Severity = "sometimes"
 	if err := cfg.Validate(); err == nil {
 		t.Fatal("expected an invalid Simple English severity to fail")
+	}
+}
+
+func TestWriteCreatesACompleteConfiguration(t *testing.T) {
+	path := filepath.Join(t.TempDir(), FileName)
+	cfg := Default()
+	cfg.Semantic.Enabled = true
+	cfg.SimpleEnglish.Allow = []string{"OAuth"}
+	if err := Write(path, cfg); err != nil {
+		t.Fatal(err)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var written Config
+	if err := json.Unmarshal(data, &written); err != nil {
+		t.Fatal(err)
+	}
+	if !written.Semantic.Enabled || !written.SimpleEnglish.Enabled || len(written.SimpleEnglish.Allow) != 1 {
+		t.Fatalf("unexpected configuration: %#v", written)
 	}
 }

@@ -34,7 +34,7 @@ type BodyConfig struct {
 type SemanticConfig struct {
 	Enabled      bool   `json:"enabled"`
 	Runtime      string `json:"runtime"`
-	Endpoint     string `json:"endpoint"`
+	Endpoint     string `json:"endpoint,omitempty"`
 	Model        string `json:"model"`
 	Timeout      string `json:"timeout"`
 	MaxDiffBytes int    `json:"maxDiffBytes"`
@@ -44,6 +44,40 @@ type SimpleEnglishConfig struct {
 	Enabled  bool     `json:"enabled"`
 	Severity string   `json:"severity"`
 	Allow    []string `json:"allow"`
+}
+
+func Write(path string, cfg Config) error {
+	if err := cfg.Validate(); err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return err
+	}
+	data = append(data, '\n')
+
+	directory := filepath.Dir(path)
+	if err := os.MkdirAll(directory, 0o755); err != nil {
+		return err
+	}
+	temporary, err := os.CreateTemp(directory, ".prosecheck-*.tmp")
+	if err != nil {
+		return err
+	}
+	temporaryPath := temporary.Name()
+	defer os.Remove(temporaryPath)
+	if err := temporary.Chmod(0o644); err != nil {
+		temporary.Close()
+		return err
+	}
+	if _, err := temporary.Write(data); err != nil {
+		temporary.Close()
+		return err
+	}
+	if err := temporary.Close(); err != nil {
+		return err
+	}
+	return os.Rename(temporaryPath, path)
 }
 
 func Default() Config {

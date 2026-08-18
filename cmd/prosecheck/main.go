@@ -34,6 +34,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	switch args[0] {
 	case "check":
 		return runCheck(args[1:], stdin, stdout, stderr)
+	case "init":
+		return runInit(args[1:], stdin, stdout, stderr)
 	case "install-hook":
 		return runInstallHook(args[1:], stdout, stderr)
 	case "uninstall-hook":
@@ -477,6 +479,7 @@ func writeUsage(w io.Writer) {
 
 Usage:
   prosecheck check [flags] [message-file]
+  prosecheck init
   prosecheck install-hook
   prosecheck uninstall-hook
   prosecheck model <command>

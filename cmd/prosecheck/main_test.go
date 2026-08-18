@@ -1,11 +1,15 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/DheerG/prosecheck/internal/config"
 )
 
 func TestRunCheckPassesClearMessage(t *testing.T) {
@@ -106,5 +110,71 @@ func TestRunCheckRequiresManagedModelWhenForced(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), "model install") {
 		t.Fatalf("unexpected error %q", stderr.String())
+	}
+}
+
+func TestRunInitCreatesRecommendedConfigurationAndHook(t *testing.T) {
+	repository := t.TempDir()
+	command := exec.Command("git", "init", "--quiet", repository)
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("git init failed: %v: %s", err, output)
+	}
+
+	var stdout, stderr bytes.Buffer
+	exitCode := run([]string{
+		"init", "--yes", "--semantic", "off", "--repository", repository,
+	}, strings.NewReader(""), &stdout, &stderr)
+	if exitCode != 0 {
+		t.Fatalf("expected exit code 0, got %d: %s", exitCode, stderr.String())
+	}
+
+	cfg, _, err := config.Load(filepath.Join(repository, config.FileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.SimpleEnglish.Enabled || cfg.Semantic.Enabled {
+		t.Fatalf("unexpected configuration: %#v", cfg)
+	}
+	hookPath := filepath.Join(repository, ".git", "hooks", "commit-msg")
+	if _, err := os.Stat(hookPath); err != nil {
+		t.Fatalf("expected a commit hook: %v", err)
+	}
+	if !strings.Contains(stdout.String(), "git add .prosecheck.json") {
+		t.Fatalf("unexpected output %q", stdout.String())
+	}
+}
+
+func TestChooseInitOptionsUsesInteractiveDefaults(t *testing.T) {
+	var output bytes.Buffer
+	reader := answerReader{scanner: bufio.NewScanner(strings.NewReader("\n\n")), output: &output}
+	choices, err := chooseInitOptions(reader, false, false, "", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !choices.simpleEnglish || choices.semantic || !choices.hook {
+		t.Fatalf("unexpected choices: %#v", choices)
+	}
+	if !strings.Contains(output.String(), "large download") {
+		t.Fatalf("expected a model explanation, got %q", output.String())
+	}
+}
+
+func TestRunInitCanCancelBeforeWritingFiles(t *testing.T) {
+	repository := t.TempDir()
+	command := exec.Command("git", "init", "--quiet", repository)
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("git init failed: %v: %s", err, output)
+	}
+
+	var stdout, stderr bytes.Buffer
+	exitCode := run([]string{"init", "--repository", repository}, strings.NewReader("\n\nn\n"), &stdout, &stderr)
+	if exitCode != 0 {
+		t.Fatalf("expected exit code 0, got %d: %s", exitCode, stderr.String())
+	}
+	if _, err := os.Stat(filepath.Join(repository, config.FileName)); !os.IsNotExist(err) {
+		t.Fatalf("expected no configuration, got %v", err)
+	}
+	if !strings.Contains(stdout.String(), "No files changed") {
+		t.Fatalf("unexpected output %q", stdout.String())
 	}
 }
