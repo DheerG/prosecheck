@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dheer/prosecheck/internal/checker"
+	"github.com/DheerG/prosecheck/internal/checker"
 )
 
 type Options struct {

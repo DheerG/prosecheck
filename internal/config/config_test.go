@@ -11,7 +11,7 @@ func TestLoadMergesFileWithDefaults(t *testing.T) {
 	path := filepath.Join(directory, "config.json")
 	if err := os.WriteFile(path, []byte(`{
   "subject": {"maxLength": 60},
-  "semantic": {"enabled": true, "model": "local-model"}
+  "semantic": {"enabled": true}
 }`), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -26,8 +26,11 @@ func TestLoadMergesFileWithDefaults(t *testing.T) {
 	if cfg.Subject.MaxLength != 60 || cfg.Subject.MinLength != 10 {
 		t.Fatalf("defaults were not merged: %#v", cfg.Subject)
 	}
-	if cfg.Semantic.Model != "local-model" || cfg.Semantic.Timeout != "20s" {
+	if cfg.Semantic.Model != "bonsai-8b" || cfg.Semantic.Timeout != "20s" {
 		t.Fatalf("semantic defaults were not merged: %#v", cfg.Semantic)
+	}
+	if cfg.Semantic.Runtime != "managed" {
+		t.Fatalf("expected the managed runtime, got %q", cfg.Semantic.Runtime)
 	}
 }
 
@@ -50,6 +53,30 @@ func TestLoadAppliesEnvironment(t *testing.T) {
 	}
 	if cfg.Semantic.Endpoint != "http://127.0.0.1:9999/v1" || cfg.Semantic.Model != "environment-model" {
 		t.Fatalf("environment was not applied: %#v", cfg.Semantic)
+	}
+	if cfg.Semantic.Runtime != "external" {
+		t.Fatalf("an endpoint override must select the external runtime: %#v", cfg.Semantic)
+	}
+}
+
+func TestLoadTreatsAnExistingEndpointAsExternal(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	if err := os.WriteFile(path, []byte(`{
+  "semantic": {
+    "enabled": true,
+    "endpoint": "http://127.0.0.1:9000/v1",
+    "model": "older-model"
+  }
+}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, _, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Semantic.Runtime != "external" {
+		t.Fatalf("expected an external runtime, got %q", cfg.Semantic.Runtime)
 	}
 }
 

@@ -11,11 +11,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dheer/prosecheck/internal/checker"
-	"github.com/dheer/prosecheck/internal/config"
-	"github.com/dheer/prosecheck/internal/gitutil"
-	"github.com/dheer/prosecheck/internal/hook"
-	"github.com/dheer/prosecheck/internal/semantic"
+	"github.com/DheerG/prosecheck/internal/checker"
+	"github.com/DheerG/prosecheck/internal/config"
+	"github.com/DheerG/prosecheck/internal/gitutil"
+	"github.com/DheerG/prosecheck/internal/hook"
+	"github.com/DheerG/prosecheck/internal/modelruntime"
+	"github.com/DheerG/prosecheck/internal/semantic"
 )
 
 const version = "0.1.0-dev"
@@ -37,6 +38,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return runInstallHook(args[1:], stdout, stderr)
 	case "uninstall-hook":
 		return runUninstallHook(args[1:], stdout, stderr)
+	case "model":
+		return runModel(args[1:], stdout, stderr)
 	case "version", "--version", "-v":
 		fmt.Fprintln(stdout, version)
 		return 0
@@ -113,13 +116,47 @@ func runCheck(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 				fmt.Fprintf(stderr, "The semantic timeout is not valid: %v\n", parseErr)
 				return 2
 			}
+			endpoint := cfg.Semantic.Endpoint
+			model := cfg.Semantic.Model
+			if cfg.Semantic.Runtime == "managed" {
+				manager, managerErr := modelruntime.New()
+				if managerErr == nil {
+					startContext, cancelStart := context.WithTimeout(context.Background(), 2*time.Minute)
+					var state modelruntime.State
+					state, managerErr = manager.EnsureRunning(startContext)
+					cancelStart()
+					if managerErr == nil {
+						endpoint = state.Endpoint
+						model = state.Model
+					}
+				}
+				if managerErr != nil {
+					if *semanticMode == "on" {
+						fmt.Fprintf(stderr, "The semantic review failed: %v\n", managerErr)
+						return 2
+					}
+					report.Findings = append(report.Findings, checker.Finding{
+						Code:       "PC901",
+						Severity:   checker.SeverityInfo,
+						Source:     checker.SourceSystem,
+						Message:    "The semantic review did not run.",
+						Suggestion: managerErr.Error(),
+					})
+					useSemantic = false
+				}
+			}
+			if !useSemantic {
+				checker.SortFindings(report.Findings)
+				return writeReport(stdout, stderr, report, *format, *strict)
+			}
+
 			ctx, cancel := context.WithTimeout(context.Background(), timeout)
 			defer cancel()
 
 			diff, _ := gitutil.StagedDiff(ctx, cfg.Semantic.MaxDiffBytes)
 			client := semantic.NewClient(semantic.Options{
-				Endpoint: cfg.Semantic.Endpoint,
-				Model:    cfg.Semantic.Model,
+				Endpoint: endpoint,
+				Model:    model,
 				Timeout:  timeout,
 			})
 			findings, reviewErr := client.Review(ctx, message, diff)
@@ -143,7 +180,11 @@ func runCheck(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 
 	checker.SortFindings(report.Findings)
-	if *format == "json" {
+	return writeReport(stdout, stderr, report, *format, *strict)
+}
+
+func writeReport(stdout, stderr io.Writer, report checker.Report, format string, strict bool) int {
+	if format == "json" {
 		encoder := json.NewEncoder(stdout)
 		encoder.SetIndent("", "  ")
 		if err := encoder.Encode(report); err != nil {
@@ -154,7 +195,7 @@ func runCheck(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		writeTextReport(stdout, report)
 	}
 
-	if report.Failed(*strict) {
+	if report.Failed(strict) {
 		return 1
 	}
 	return 0
@@ -256,6 +297,181 @@ func runUninstallHook(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
+func runModel(args []string, stdout, stderr io.Writer) int {
+	if len(args) == 0 {
+		writeModelUsage(stderr)
+		return 2
+	}
+	manager, err := modelruntime.New()
+	if err != nil {
+		fmt.Fprintf(stderr, "Cannot prepare the model manager: %v\n", err)
+		return 2
+	}
+
+	switch args[0] {
+	case "install":
+		return runModelInstall(manager, args[1:], stdout, stderr)
+	case "start":
+		return runModelStart(manager, args[1:], stdout, stderr)
+	case "status":
+		return runModelStatus(manager, args[1:], stdout, stderr)
+	case "doctor":
+		return runModelDoctor(manager, args[1:], stdout, stderr)
+	case "logs":
+		return runModelLogs(manager, args[1:], stdout, stderr)
+	case "stop":
+		return runModelStop(manager, args[1:], stdout, stderr)
+	case "help", "--help", "-h":
+		writeModelUsage(stdout)
+		return 0
+	default:
+		fmt.Fprintf(stderr, "Unknown model command %q.\n\n", args[0])
+		writeModelUsage(stderr)
+		return 2
+	}
+}
+
+func runModelInstall(manager *modelruntime.Manager, args []string, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("model install", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	modelFile := fs.String("model-file", "", "import this model file instead of downloading it")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if fs.NArg() > 1 || (fs.NArg() == 1 && fs.Arg(0) != modelruntime.ModelName) {
+		fmt.Fprintf(stderr, "The supported model is %s.\n", modelruntime.ModelName)
+		return 2
+	}
+	if err := manager.Install(context.Background(), *modelFile, func(message string) {
+		fmt.Fprintln(stdout, message)
+	}); err != nil {
+		fmt.Fprintf(stderr, "Cannot install the model: %v\n", err)
+		return 2
+	}
+	return 0
+}
+
+func runModelStart(manager *modelruntime.Manager, args []string, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("model start", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	port := fs.Int("port", 0, "preferred local port; default 11435")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if fs.NArg() != 0 || *port < 0 || *port > 65535 {
+		fmt.Fprintln(stderr, "The start command accepts an optional port from 1 to 65535.")
+		return 2
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	state, err := manager.Start(ctx, *port)
+	if err != nil {
+		fmt.Fprintf(stderr, "Cannot start the model: %v\n", err)
+		return 2
+	}
+	fmt.Fprintf(stdout, "Bonsai is ready at %s.\n", state.Endpoint)
+	return 0
+}
+
+func runModelStatus(manager *modelruntime.Manager, args []string, stdout, stderr io.Writer) int {
+	if len(args) != 0 {
+		fmt.Fprintln(stderr, "The status command does not accept arguments.")
+		return 2
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	status := manager.Status(ctx)
+	if !status.Installed {
+		fmt.Fprintln(stdout, "Bonsai is not installed.")
+		fmt.Fprintf(stdout, "Run `prosecheck model install %s`.\n", modelruntime.ModelName)
+		return 1
+	}
+	if !status.Running {
+		fmt.Fprintln(stdout, "Bonsai is installed but stopped.")
+		return 1
+	}
+	fmt.Fprintf(stdout, "Bonsai is running at %s.\n", status.State.Endpoint)
+	return 0
+}
+
+func runModelDoctor(manager *modelruntime.Manager, args []string, stdout, stderr io.Writer) int {
+	if len(args) != 0 {
+		fmt.Fprintln(stderr, "The doctor command does not accept arguments.")
+		return 2
+	}
+	startContext, cancelStart := context.WithTimeout(context.Background(), 2*time.Minute)
+	state, err := manager.EnsureRunning(startContext)
+	cancelStart()
+	if err != nil {
+		fmt.Fprintf(stderr, "The model is not ready: %v\n", err)
+		return 2
+	}
+	reviewContext, cancelReview := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancelReview()
+	client := semantic.NewClient(semantic.Options{
+		Endpoint: state.Endpoint, Model: state.Model, Timeout: 30 * time.Second,
+	})
+	_, err = client.Review(reviewContext,
+		"Prevent duplicate invoice delivery\n\nReject a repeated delivery before the queue accepts it.", "")
+	if err != nil {
+		fmt.Fprintf(stderr, "The model server started but could not complete a review: %v\n", err)
+		return 2
+	}
+	fmt.Fprintf(stdout, "Bonsai completed a test review at %s.\n", state.Endpoint)
+	return 0
+}
+
+func runModelLogs(manager *modelruntime.Manager, args []string, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("model logs", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	lines := fs.Int("lines", 40, "number of recent log lines")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if fs.NArg() != 0 || *lines < 1 {
+		fmt.Fprintln(stderr, "The lines value must be more than zero.")
+		return 2
+	}
+	logs, err := manager.TailLogs(*lines)
+	if err != nil {
+		fmt.Fprintf(stderr, "Cannot read the model log: %v\n", err)
+		return 2
+	}
+	if logs == "" {
+		fmt.Fprintf(stdout, "The model log is empty: %s\n", manager.Paths().Log)
+		return 0
+	}
+	fmt.Fprintln(stdout, logs)
+	return 0
+}
+
+func runModelStop(manager *modelruntime.Manager, args []string, stdout, stderr io.Writer) int {
+	if len(args) != 0 {
+		fmt.Fprintln(stderr, "The stop command does not accept arguments.")
+		return 2
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := manager.Stop(ctx); err != nil {
+		fmt.Fprintf(stderr, "Cannot stop the model: %v\n", err)
+		return 2
+	}
+	fmt.Fprintln(stdout, "Bonsai is stopped.")
+	return 0
+}
+
+func writeModelUsage(w io.Writer) {
+	fmt.Fprintln(w, `prosecheck manages a private Bonsai model server.
+
+Usage:
+  prosecheck model install [--model-file path] [bonsai-8b]
+  prosecheck model start [--port number]
+  prosecheck model status
+  prosecheck model doctor
+  prosecheck model logs [--lines number]
+  prosecheck model stop`)
+}
+
 func writeUsage(w io.Writer) {
 	fmt.Fprintln(w, `prosecheck checks Git commit messages.
 
@@ -263,6 +479,7 @@ Usage:
   prosecheck check [flags] [message-file]
   prosecheck install-hook
   prosecheck uninstall-hook
+  prosecheck model <command>
   prosecheck version
 
 Examples:

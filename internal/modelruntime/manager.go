@@ -241,11 +241,16 @@ func (m *Manager) TailLogs(lines int) (string, error) {
 
 func (m *Manager) installed() bool {
 	asset, err := currentAsset()
-	if err != nil || !validFile(m.paths.Model, ModelSHA256) {
+	if err != nil || !modelPresent(m.paths.Model) {
 		return false
 	}
 	_, err = findServer(m.paths.Runtime, asset.ServerExe)
 	return err == nil
+}
+
+func modelPresent(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir() && info.Size() == ModelSize
 }
 
 func (m *Manager) healthy(ctx context.Context, endpoint string) bool {

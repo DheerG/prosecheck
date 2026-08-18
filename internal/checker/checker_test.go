@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dheer/prosecheck/internal/config"
+	"github.com/DheerG/prosecheck/internal/config"
 )
 
 func TestCheckAcceptsDurableMessage(t *testing.T) {

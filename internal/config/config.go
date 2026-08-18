@@ -32,6 +32,7 @@ type BodyConfig struct {
 
 type SemanticConfig struct {
 	Enabled      bool   `json:"enabled"`
+	Runtime      string `json:"runtime"`
 	Endpoint     string `json:"endpoint"`
 	Model        string `json:"model"`
 	Timeout      string `json:"timeout"`
@@ -44,8 +45,8 @@ func Default() Config {
 		Body:    BodyConfig{MaxLineLength: 100, MaxSentenceWords: 25},
 		Rules:   map[string]string{},
 		Semantic: SemanticConfig{
-			Endpoint: "http://127.0.0.1:11434/v1",
-			Timeout:  "20s", MaxDiffBytes: 12000,
+			Runtime: "managed", Model: "bonsai-8b",
+			Timeout: "20s", MaxDiffBytes: 12000,
 		},
 	}
 }
@@ -64,6 +65,7 @@ func Load(explicitPath string) (Config, string, error) {
 		if err := json.Unmarshal(data, &cfg); err != nil {
 			return Config{}, "", fmt.Errorf("%s: %w", path, err)
 		}
+		applyLegacySemanticDefaults(data, &cfg)
 	}
 	applyEnvironment(&cfg)
 	if err := cfg.Validate(); err != nil {
@@ -82,8 +84,17 @@ func (c Config) Validate() error {
 	if c.Body.MaxLineLength < 1 || c.Body.MaxSentenceWords < 1 {
 		return errors.New("body limits must be more than zero")
 	}
-	if c.Semantic.Endpoint == "" {
-		return errors.New("semantic.endpoint cannot be empty")
+	switch c.Semantic.Runtime {
+	case "managed":
+		if c.Semantic.Model != "bonsai-8b" {
+			return errors.New("semantic.model must be bonsai-8b when semantic.runtime is managed")
+		}
+	case "external":
+		if c.Semantic.Endpoint == "" {
+			return errors.New("semantic.endpoint cannot be empty when semantic.runtime is external")
+		}
+	default:
+		return errors.New("semantic.runtime must be managed or external")
 	}
 	if _, err := time.ParseDuration(c.Semantic.Timeout); err != nil {
 		return fmt.Errorf("semantic.timeout: %w", err)
@@ -143,8 +154,26 @@ func fileExists(path string) bool {
 func applyEnvironment(cfg *Config) {
 	if value := os.Getenv("PROSECHECK_ENDPOINT"); value != "" {
 		cfg.Semantic.Endpoint = value
+		cfg.Semantic.Runtime = "external"
 	}
 	if value := os.Getenv("PROSECHECK_MODEL"); value != "" {
 		cfg.Semantic.Model = value
+	}
+	if value := os.Getenv("PROSECHECK_RUNTIME"); value != "" {
+		cfg.Semantic.Runtime = value
+	}
+}
+
+func applyLegacySemanticDefaults(data []byte, cfg *Config) {
+	var raw struct {
+		Semantic map[string]json.RawMessage `json:"semantic"`
+	}
+	if json.Unmarshal(data, &raw) != nil || raw.Semantic == nil {
+		return
+	}
+	_, hasRuntime := raw.Semantic["runtime"]
+	_, hasEndpoint := raw.Semantic["endpoint"]
+	if !hasRuntime && hasEndpoint {
+		cfg.Semantic.Runtime = "external"
 	}
 }

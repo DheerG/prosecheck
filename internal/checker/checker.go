@@ -5,7 +5,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/dheer/prosecheck/internal/config"
+	"github.com/DheerG/prosecheck/internal/config"
 )
 
 var (
