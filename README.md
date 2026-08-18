@@ -190,6 +190,7 @@ Read [Compare local models](docs/model-comparison.md) for benchmark and syntheti
 - [Simple English policy](docs/simple-english.md)
 - [Local model](docs/local-model.md)
 - [Model comparison](docs/model-comparison.md)
+- [Contribution guidelines](CONTRIBUTING.md)
 
 Commit messages are the current focus. A later version can apply the same policy to pull request titles and descriptions.
 
