@@ -36,6 +36,12 @@ Make sure that the Go binary directory is on `PATH`. Then run this command:
 prosecheck version
 ```
 
+You can also install the latest public version:
+
+```sh
+go install github.com/DheerG/prosecheck/cmd/prosecheck@latest
+```
+
 ## Check a message
 
 Pass a message directly:
@@ -120,7 +126,7 @@ Each rule can use `error`, `warning`, `info`, or `off`.
 
 The file merges with the default configuration. You only need to include values that you want to change.
 
-## Local model review
+## Add a local model review
 
 The local model review is optional. Local rules work without a model.
 
@@ -135,19 +141,42 @@ The reviewer checks for these problems:
 
 Model findings are notes in this version. They do not block a commit, even when the hook uses strict mode.
 
-prosecheck uses an OpenAI-compatible endpoint. Enable the reviewer in `.prosecheck.json`:
+Install the supported Bonsai model once on each computer:
+
+```sh
+prosecheck model install bonsai-8b
+```
+
+This command downloads a pinned Prism runtime and a 1.16 GB model file. It verifies both files before installation.
+
+Enable the reviewer in `.prosecheck.json`:
 
 ```json
 {
   "semantic": {
     "enabled": true,
-    "endpoint": "http://127.0.0.1:8080/v1",
-    "model": "bonsai",
+    "runtime": "managed",
+    "model": "bonsai-8b",
     "timeout": "20s",
     "maxDiffBytes": 12000
   }
 }
 ```
+
+prosecheck starts the model when a check needs it. The server listens only on the local computer.
+
+The preferred port is `11435`. If that port is busy, prosecheck selects a free port and records it outside the repository.
+
+Use these commands to inspect or control the model:
+
+```sh
+prosecheck model status
+prosecheck model doctor
+prosecheck model logs
+prosecheck model stop
+```
+
+The managed runtime does not use Ollama.
 
 Use `--semantic on` for one required model review. The command returns an operational error when the model cannot respond.
 
@@ -157,7 +186,7 @@ prosecheck check --semantic on --message "Explain the durable outcome"
 
 Use `--semantic off` to skip a reviewer that the configuration enables.
 
-Read [Run Bonsai locally](docs/bonsai.md) for the tested Bonsai setup.
+Read [Run Bonsai locally](docs/bonsai.md) for storage details, file imports, and an external-server setup.
 
 ## Exit codes
 
@@ -199,4 +228,4 @@ go test ./...
 go vet ./...
 ```
 
-The project uses only the Go standard library. Tests simulate the local model server and do not require a model download.
+The project uses only the Go standard library. Tests do not require a model download.

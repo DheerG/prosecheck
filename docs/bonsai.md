@@ -1,55 +1,31 @@
 # Run Bonsai locally
 
-This setup runs 1-bit Bonsai 8B with an OpenAI-compatible server. The model stays on the local computer.
+prosecheck can manage Bonsai 8B without Ollama. The model and its server stay on your computer.
 
-## Requirements
+## Install the model
 
-Install these tools:
-
-- Git
-- CMake
-- A C and C++ compiler
-- The `Bonsai-8B-Q1_0.gguf` model file
-
-The model file is approximately 1.16 GB. Download it from the [Prism ML model page](https://huggingface.co/prism-ml/Bonsai-8B-gguf).
-
-## Build the supported runtime
-
-Clone the Prism ML fork of llama.cpp:
+Run this command once:
 
 ```sh
-git clone --depth 1 https://github.com/PrismML-Eng/llama.cpp.git
-cd llama.cpp
+prosecheck model install bonsai-8b
 ```
 
-Configure the build on macOS:
+The command downloads these pinned files:
+
+- The `Bonsai-8B-Q1_0.gguf` model from [Prism ML](https://huggingface.co/prism-ml/Bonsai-8B-gguf)
+- The matching server from the [Prism llama.cpp release](https://github.com/PrismML-Eng/llama.cpp/releases/tag/prism-b9599-9ca265a)
+
+The model is approximately 1.16 GB. prosecheck checks each file before it installs the file.
+
+If you already have the exact model file, import it instead:
 
 ```sh
-cmake -B build -DGGML_METAL=ON -DGGML_NATIVE=ON -DLLAMA_BUILD_UI=OFF
+prosecheck model install --model-file /path/to/Bonsai-8B-Q1_0.gguf bonsai-8b
 ```
 
-Build the server:
+prosecheck still downloads and verifies the matching server. It also verifies the imported model.
 
-```sh
-cmake --build build -j --target llama-server
-```
-
-## Start the server
-
-Replace `/path/to/Bonsai-8B-Q1_0.gguf` with the model path.
-
-```sh
-./build/bin/llama-server \
-  -m /path/to/Bonsai-8B-Q1_0.gguf \
-  --host 127.0.0.1 \
-  --port 8080 \
-  -ngl 99 \
-  -c 8192
-```
-
-While prosecheck uses the model, keep this process open.
-
-## Configure prosecheck
+## Enable model reviews
 
 Add this section to `.prosecheck.json`:
 
@@ -57,30 +33,73 @@ Add this section to `.prosecheck.json`:
 {
   "semantic": {
     "enabled": true,
-    "endpoint": "http://127.0.0.1:8080/v1",
-    "model": "bonsai",
+    "runtime": "managed",
+    "model": "bonsai-8b",
     "timeout": "20s",
     "maxDiffBytes": 12000
   }
 }
 ```
 
-Check a context-dependent message:
+The next check starts the server when necessary. The first check can take longer while the model loads.
+
+The server uses `127.0.0.1`, so other computers cannot connect to it. It prefers port `11435` and selects another port when necessary.
+
+The selected port and process details stay in the user data directory. They do not enter the repository configuration.
+
+## Check the installation
+
+Run a complete test:
 
 ```sh
-prosecheck check --semantic on --message "Handle the revised path
-
-This addresses the issue from our last meeting."
+prosecheck model doctor
 ```
 
-The reviewer reports that future readers cannot access the meeting context.
+This command starts the server and asks Bonsai to review a test message.
 
-## Tested result
+Use these commands for routine checks:
 
-The Prism ML runtime loaded Bonsai 8B on an Apple M1 Pro with 32 GB of memory.
+```sh
+prosecheck model status
+prosecheck model logs --lines 80
+prosecheck model stop
+```
 
-The model generated approximately 47 to 52 tokens per second. A semantic review took between 0.3 and 2.0 seconds when warm.
+`model stop` stops only the server that prosecheck started.
 
-Ollama 0.24 downloaded the `Q1_0` model but failed to load it on the same computer. Its Metal runner rejected the tensor type.
+## Storage
 
-Use the Prism ML fork until the installed Ollama release can load this model.
+prosecheck stores the model, server, state, and logs in the operating system's user data directory.
+
+Set `PROSECHECK_HOME` if you need a different location:
+
+```sh
+PROSECHECK_HOME=/path/to/data prosecheck model status
+```
+
+Do not point this variable at a repository. The model file is too large for Git.
+
+## Use another local server
+
+You can use any OpenAI-compatible server instead of the managed runtime:
+
+```json
+{
+  "semantic": {
+    "enabled": true,
+    "runtime": "external",
+    "endpoint": "http://127.0.0.1:9000/v1",
+    "model": "your-model-name",
+    "timeout": "20s",
+    "maxDiffBytes": 12000
+  }
+}
+```
+
+prosecheck does not start, stop, or change an external server.
+
+## Privacy
+
+Local rules never send data to a model. A model review sends the commit message and a limited staged diff to the selected server.
+
+The managed server runs on your computer. An external endpoint can send this data elsewhere, depending on that server.
