@@ -18,13 +18,15 @@ import (
 )
 
 type Options struct {
-	Paths      Paths
-	HTTPClient *http.Client
+	Paths          Paths
+	HTTPClient     *http.Client
+	DownloadClient *http.Client
 }
 
 type Manager struct {
-	paths Paths
-	http  *http.Client
+	paths        Paths
+	healthHTTP   *http.Client
+	downloadHTTP *http.Client
 }
 
 type State struct {
@@ -54,11 +56,17 @@ func New() (*Manager, error) {
 }
 
 func NewWithOptions(options Options) *Manager {
-	client := options.HTTPClient
-	if client == nil {
-		client = &http.Client{Timeout: 2 * time.Second}
+	healthClient := options.HTTPClient
+	if healthClient == nil {
+		healthClient = &http.Client{Timeout: 2 * time.Second}
 	}
-	return &Manager{paths: options.Paths, http: client}
+	downloadClient := options.DownloadClient
+	if downloadClient == nil {
+		downloadClient = &http.Client{}
+	}
+	return &Manager{
+		paths: options.Paths, healthHTTP: healthClient, downloadHTTP: downloadClient,
+	}
 }
 
 func (m *Manager) Paths() Paths {
@@ -268,7 +276,7 @@ func (m *Manager) healthy(ctx context.Context, endpoint string) bool {
 	if err != nil {
 		return false
 	}
-	response, err := m.http.Do(request)
+	response, err := m.healthHTTP.Do(request)
 	if err != nil {
 		return false
 	}

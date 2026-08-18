@@ -110,7 +110,7 @@ func (m *Manager) downloadVerified(ctx context.Context, sourceURL, destination, 
 	if err != nil {
 		return err
 	}
-	response, err := m.http.Do(request)
+	response, err := m.downloadHTTP.Do(request)
 	if err != nil {
 		return err
 	}

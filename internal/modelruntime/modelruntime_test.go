@@ -5,11 +5,39 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
+	"io"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (function roundTripFunc) RoundTrip(request *http.Request) (*http.Response, error) {
+	return function(request)
+}
+
+type interruptedBody struct {
+	sent bool
+}
+
+func (body *interruptedBody) Read(buffer []byte) (int, error) {
+	if body.sent {
+		return 0, errors.New("download interrupted")
+	}
+	body.sent = true
+	return copy(buffer, "partial data"), nil
+}
+
+func (body *interruptedBody) Close() error {
+	return nil
+}
 
 func TestDefaultPathsUsesProsecheckHome(t *testing.T) {
 	root := t.TempDir()
@@ -57,6 +85,69 @@ func TestTailLogsReturnsLastLines(t *testing.T) {
 	}
 	if logs != "two\nthree" {
 		t.Fatalf("unexpected log tail %q", logs)
+	}
+}
+
+func TestDefaultDownloadClientHasNoOverallTimeout(t *testing.T) {
+	manager := NewWithOptions(Options{Paths: PathsForRoot(t.TempDir())})
+	if manager.healthHTTP.Timeout != 2*time.Second {
+		t.Fatalf("unexpected health timeout: %s", manager.healthHTTP.Timeout)
+	}
+	if manager.downloadHTTP.Timeout != 0 {
+		t.Fatalf("expected no overall download timeout, got %s", manager.downloadHTTP.Timeout)
+	}
+}
+
+func TestDownloadUsesItsOwnHTTPClient(t *testing.T) {
+	content := []byte("complete model")
+	hash := sha256.Sum256(content)
+	downloadClient := &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(bytes.NewReader(content)),
+			Header:     make(http.Header),
+		}, nil
+	})}
+	healthClient := &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+		return nil, errors.New("the health client must not download files")
+	})}
+	manager := NewWithOptions(Options{
+		Paths: PathsForRoot(t.TempDir()), HTTPClient: healthClient, DownloadClient: downloadClient,
+	})
+	destination := filepath.Join(t.TempDir(), "model.gguf")
+	if err := manager.downloadVerified(context.Background(), "https://model.test/model.gguf", destination, hex.EncodeToString(hash[:])); err != nil {
+		t.Fatal(err)
+	}
+	written, err := os.ReadFile(destination)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(written, content) {
+		t.Fatalf("unexpected downloaded data: %q", written)
+	}
+}
+
+func TestDownloadRemovesPartialFileAfterInterruption(t *testing.T) {
+	downloadClient := &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       &interruptedBody{},
+			Header:     make(http.Header),
+		}, nil
+	})}
+	manager := NewWithOptions(Options{
+		Paths: PathsForRoot(t.TempDir()), DownloadClient: downloadClient,
+	})
+	destination := filepath.Join(t.TempDir(), "model.gguf")
+	err := manager.downloadVerified(context.Background(), "https://model.test/model.gguf", destination, "unused")
+	if err == nil {
+		t.Fatal("expected the interrupted download to fail")
+	}
+	if _, statErr := os.Stat(destination + ".partial"); !errors.Is(statErr, os.ErrNotExist) {
+		t.Fatalf("expected the partial file to be removed, got %v", statErr)
+	}
+	if _, statErr := os.Stat(destination); !errors.Is(statErr, os.ErrNotExist) {
+		t.Fatalf("expected no destination file, got %v", statErr)
 	}
 }
 
