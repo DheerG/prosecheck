@@ -1,0 +1,202 @@
+# prosecheck
+
+prosecheck finds unclear Git commit messages before they enter the project history.
+
+The command uses fast local rules by default. An optional local model can find missing context and vague language.
+
+The Git hook does not need GitHub Actions. It runs on each local computer and does not use an external API.
+
+## Current scope
+
+This first version checks commit subjects and bodies. Support for pull request text will use the same checker in a later version.
+
+prosecheck finds these common problems:
+
+- Empty or temporary subjects, such as `WIP`
+- Vague subjects, such as `Update code`
+- Past-tense subjects, such as `Updated account checks`
+- Missing blank lines after the subject
+- Bodies that start with file lists or implementation details
+- Bodies that narrate the commit process
+- Long lines and long sentences
+- Context that will not make sense later
+
+## Build prosecheck
+
+Go 1.22 or a later compatible release is required.
+
+```sh
+go test ./...
+go install ./cmd/prosecheck
+```
+
+Make sure that the Go binary directory is on `PATH`. Then run this command:
+
+```sh
+prosecheck version
+```
+
+## Check a message
+
+Pass a message directly:
+
+```sh
+prosecheck check --message "Prevent duplicate invoice delivery"
+```
+
+Pass a message file:
+
+```sh
+prosecheck check .git/COMMIT_EDITMSG
+```
+
+Pass a message through standard input:
+
+```sh
+git log -1 --format=%B | prosecheck check
+```
+
+Warnings do not cause an error by default. Add `--strict` to return an error for warnings.
+
+```sh
+prosecheck check --strict --message "Updated code"
+```
+
+If another program reads the result, use `--format json`.
+
+## Install the Git hook
+
+Install the `prosecheck` binary once on each computer. Each repository needs its own policy file and hook entry.
+
+The hook calls `prosecheck` from `PATH`. Run this command in the repository:
+
+```sh
+prosecheck install-hook
+```
+
+The hook uses strict mode for local rules. It blocks a commit when a rule reports an error or warning.
+
+The installer uses these rules:
+
+| Repository setup | Installer action |
+|---|---|
+| Plain Git | Create a managed `commit-msg` hook. |
+| Custom Git hooks path | Create the hook in the configured path. |
+| Husky | Add a managed block to `.husky/commit-msg`. |
+| Lefthook | Show the entry to add to the Lefthook configuration. |
+| pre-commit | Show the local hook entry and installation command. |
+| Overcommit | Show the entry to add to `.overcommit.yml`. |
+
+The installer never replaces an existing custom hook. It also never changes Husky files in `.husky/_`.
+
+Remove a hook that prosecheck manages:
+
+```sh
+prosecheck uninstall-hook
+```
+
+Read [Connect prosecheck to Git hooks](docs/hooks.md) for manager-specific examples.
+
+## Configuration
+
+Copy the example file into the project root:
+
+```sh
+cp .prosecheck.example.json .prosecheck.json
+```
+
+prosecheck searches for `.prosecheck.json` from the Git project root. Use `--config` to select a different file.
+
+Each rule can use `error`, `warning`, `info`, or `off`.
+
+```json
+{
+  "rules": {
+    "PC014": "off",
+    "PC005": "error"
+  }
+}
+```
+
+The file merges with the default configuration. You only need to include values that you want to change.
+
+## Local model review
+
+The local model review is optional. Local rules work without a model.
+
+The reviewer checks for these problems:
+
+- Context that will disappear
+- Missing reasons
+- Important outcomes hidden by details
+- Local jargon or shorthand
+- Differences between the message and the staged diff
+- Subjects that do not identify the outcome
+
+Model findings are notes in this version. They do not block a commit, even when the hook uses strict mode.
+
+prosecheck uses an OpenAI-compatible endpoint. Enable the reviewer in `.prosecheck.json`:
+
+```json
+{
+  "semantic": {
+    "enabled": true,
+    "endpoint": "http://127.0.0.1:8080/v1",
+    "model": "bonsai",
+    "timeout": "20s",
+    "maxDiffBytes": 12000
+  }
+}
+```
+
+Use `--semantic on` for one required model review. The command returns an operational error when the model cannot respond.
+
+```sh
+prosecheck check --semantic on --message "Explain the durable outcome"
+```
+
+Use `--semantic off` to skip a reviewer that the configuration enables.
+
+Read [Run Bonsai locally](docs/bonsai.md) for the tested Bonsai setup.
+
+## Exit codes
+
+| Code | Meaning |
+|---:|---|
+| `0` | The message passed the active policy. |
+| `1` | The message failed the active policy. |
+| `2` | prosecheck did not complete the check. |
+
+## Rule reference
+
+| Rule | Meaning | Default |
+|---|---|---|
+| `PC001` | Empty subject | Error |
+| `PC002` | Subject exceeds the character limit | Warning |
+| `PC003` | Subject gives too little information | Warning |
+| `PC004` | Subject ends with a period | Warning |
+| `PC005` | Subject is a temporary label | Error |
+| `PC006` | Subject names work but not its outcome | Warning |
+| `PC007` | Subject starts in the past tense | Warning |
+| `PC008` | Blank line is missing after the subject | Warning |
+| `PC009` | Body starts with implementation details | Warning |
+| `PC010` | Body narrates the commit process | Warning |
+| `PC011` | Body line exceeds the character limit | Warning |
+| `PC012` | Body sentence exceeds the word limit | Warning |
+| `PC013` | Body repeats the subject | Information |
+| `PC014` | Body contains a semicolon | Information |
+| `SEM001`–`SEM006` | Optional model findings | Information |
+
+Merge commits, revert commits, and autosquash subjects do not use these rules.
+
+## Development
+
+Run all automated checks:
+
+```sh
+gofmt -w cmd internal
+go test ./...
+go vet ./...
+```
+
+The project uses only the Go standard library. Tests simulate the local model server and do not require a model download.

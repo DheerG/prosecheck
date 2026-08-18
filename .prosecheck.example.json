@@ -1,0 +1,20 @@
+{
+  "subject": {
+    "maxLength": 72,
+    "minLength": 10
+  },
+  "body": {
+    "maxLineLength": 100,
+    "maxSentenceWords": 25
+  },
+  "rules": {
+    "PC014": "off"
+  },
+  "semantic": {
+    "enabled": false,
+    "endpoint": "http://127.0.0.1:8080/v1",
+    "model": "bonsai",
+    "timeout": "20s",
+    "maxDiffBytes": 12000
+  }
+}
