@@ -3,3 +3,14 @@
 /prosecheck
 *.gguf
 .DS_Store
+.env
+.env.*
+.venv/
+__pycache__/
+*.py[cod]
+/training/.cache/
+/training/checkpoints/
+/training/data/candidates/
+/training/data/generated/
+/training/data/exports/
+/training/models/
