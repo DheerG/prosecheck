@@ -1,6 +1,7 @@
 {
   "schemaVersion": 1,
   "date": "2026-08-18",
+  "lastUpdated": "2026-08-19",
   "hardware": {
     "chip": "Apple M1 Pro",
     "memoryBytes": 34359738368,
@@ -41,6 +42,34 @@
           "SEM004": {"f1": 0},
           "SEM005": {"f1": 0.571},
           "SEM006": {"f1": 0.667}
+        }
+      },
+      "ornith-1.5-9b-q4-k-m": {
+        "source": "ornith-ai/Ornith-1.5-9B-GGUF",
+        "revision": "0677a38f331a214c4e5e7bd07ecab04c14ac52f1",
+        "file": "Ornith-1.5-9B-Q4_K_M.gguf",
+        "fileBytes": 5629108992,
+        "sha256": "7d791afcb31812acc88cd5aafc675391df28c6fc3d8eae002bb4e6cc3d8cfd8d",
+        "repetitions": 3,
+        "temperature": 0,
+        "reasoning": false,
+        "precision": 0.611,
+        "recall": 0.407,
+        "f1": 0.489,
+        "exactMatchRate": 0.4,
+        "clearFalsePositiveRate": 0,
+        "protocolErrors": 0,
+        "consistencyRate": 1,
+        "meanLatencyMs": 1770,
+        "p50LatencyMs": 561,
+        "p95LatencyMs": 5076,
+        "codes": {
+          "SEM001": {"f1": 0.571},
+          "SEM002": {"f1": 0},
+          "SEM003": {"f1": 0.75},
+          "SEM004": {"f1": 0},
+          "SEM005": {"f1": 0.667},
+          "SEM006": {"f1": 0.533}
         }
       },
       "qwen-3.5-4b-q4-k-m": {

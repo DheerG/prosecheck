@@ -17,11 +17,22 @@ Each finalist reviewed all 30 cases three times at temperature zero.
 | Model | File size | Precision | Recall | F1 | Exact matches | Clear-message false positives | Mean time |
 |---|---:|---:|---:|---:|---:|---:|---:|
 | Ministral 3 8B Q4_K_M | 5.20 GB | 68.0% | 63.0% | 65.4% | 46.7% | 12.5% | 2,217 ms |
+| [Ornith 1.5 9B Q4_K_M](https://huggingface.co/ornith-ai/Ornith-1.5-9B-GGUF) | 5.63 GB | 61.1% | 40.7% | 48.9% | 40.0% | 0.0% | 1,770 ms |
 | Qwen 3.5 4B Q4_K_M | 2.74 GB | 47.6% | 37.0% | 41.7% | 40.0% | 37.5% | 1,289 ms |
 | Ministral 3 3B Q4_K_M | 2.15 GB | 44.4% | 14.8% | 22.2% | 30.0% | 25.0% | 518 ms |
 | Bonsai 8B Q1_0 | 1.16 GB | 23.5% | 14.8% | 18.2% | 23.3% | 62.5% | 657 ms |
 
 False positives matter in a commit hook. Ministral 3 8B Q4 reported a problem for one of eight clear messages. Qwen 3.5 4B reported a problem for three.
+
+Ornith 1.5 reported no problem for any clear message. However, it missed more
+real problems than Ministral. It did not replace the managed model.
+
+The Ornith run used temperature zero and disabled reasoning. These settings
+match the managed runtime. The model card recommends thinking mode for its
+published coding benchmarks.
+
+The test computer also showed higher CPU use than Ministral. We did not record
+matched CPU measurements, so this observation is qualitative.
 
 ## Smaller Ministral quantization
 
