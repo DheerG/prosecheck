@@ -218,12 +218,12 @@ func (c *Client) send(ctx context.Context, payload chatRequest) (string, int, er
 	request.Header.Set("Content-Type", "application/json")
 	response, err := c.http.Do(request)
 	if err != nil {
-		return "", 0, fmt.Errorf("cannot reach %s: %w", c.endpoint, err)
+		return "", 0, fmt.Errorf("model request to %s failed: %w", c.endpoint, err)
 	}
 	defer response.Body.Close()
 	responseBody, err := io.ReadAll(io.LimitReader(response.Body, 2<<20))
 	if err != nil {
-		return "", response.StatusCode, err
+		return "", response.StatusCode, fmt.Errorf("cannot read the model response from %s: %w", c.endpoint, err)
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		return "", response.StatusCode, fmt.Errorf("the model server returned HTTP %d: %s", response.StatusCode, compact(responseBody))

@@ -18,7 +18,7 @@
     "enabled": false,
     "runtime": "managed",
     "model": "ministral-3-8b",
-    "timeout": "20s",
+    "timeout": "60s",
     "maxDiffBytes": 12000
   }
 }

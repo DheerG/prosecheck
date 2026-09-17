@@ -3,14 +3,71 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/DheerG/prosecheck/internal/config"
 )
+
+func TestRunCheckSemanticTimeout(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.Copy(io.Discard, r.Body)
+		<-r.Context().Done()
+	}))
+	defer server.Close()
+	t.Setenv("PROSECHECK_ENDPOINT", server.URL)
+	t.Setenv("PROSECHECK_RUNTIME", "external")
+	t.Setenv("PROSECHECK_TIMEOUT", "100ms")
+	path := filepath.Join(t.TempDir(), "config.json")
+	if err := os.WriteFile(path, []byte(`{"semantic":{"enabled":true,"maxDiffBytes":0}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, mode := range []string{"auto", "on"} {
+		t.Run(mode, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			code := run([]string{"check", "--config", path, "--semantic", mode,
+				"--message", "Prevent duplicate invoice delivery"}, strings.NewReader(""), &stdout, &stderr)
+			output := stdout.String()
+			if mode == "auto" {
+				if code != 0 || !strings.Contains(output, "INFO PC901") {
+					t.Fatalf("expected a nonblocking note, got code %d: %s %s", code, output, stderr.String())
+				}
+			} else {
+				output = stderr.String()
+				if code != 2 {
+					t.Fatalf("expected code 2, got %d: %s", code, output)
+				}
+			}
+			for _, want := range []string{"timed out", "100ms", "semantic.timeout", "PROSECHECK_TIMEOUT"} {
+				if !strings.Contains(output, want) {
+					t.Errorf("expected %q in %q", want, output)
+				}
+			}
+		})
+	}
+}
+
+func TestExplainReviewError(t *testing.T) {
+	err := fmt.Errorf("request failed: %w", context.DeadlineExceeded)
+	if got := explainReviewError(err, time.Minute); !errors.Is(got, context.DeadlineExceeded) {
+		t.Fatalf("expected the deadline cause to survive: %v", got)
+	}
+	for _, err := range []error{context.Canceled, errors.New("connection refused")} {
+		if got := explainReviewError(err, time.Minute); got != err {
+			t.Fatalf("expected non-timeout error to remain unchanged, got %v", got)
+		}
+	}
+}
 
 func TestRunCheckPassesClearMessage(t *testing.T) {
 	var stdout, stderr bytes.Buffer

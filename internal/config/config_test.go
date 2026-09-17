@@ -27,7 +27,7 @@ func TestLoadMergesFileWithDefaults(t *testing.T) {
 	if cfg.Subject.MaxLength != 60 || cfg.Subject.MinLength != 10 {
 		t.Fatalf("defaults were not merged: %#v", cfg.Subject)
 	}
-	if cfg.Semantic.Model != "ministral-3-8b" || cfg.Semantic.Timeout != "20s" {
+	if cfg.Semantic.Model != "ministral-3-8b" || cfg.Semantic.Timeout != "1m0s" {
 		t.Fatalf("semantic defaults were not merged: %#v", cfg.Semantic)
 	}
 	if cfg.Semantic.Runtime != "managed" {
@@ -35,6 +35,42 @@ func TestLoadMergesFileWithDefaults(t *testing.T) {
 	}
 	if !cfg.SimpleEnglish.Enabled || cfg.SimpleEnglish.Mode != SimpleEnglishStrict || cfg.SimpleEnglish.Severity != "warning" {
 		t.Fatalf("simple English defaults were not merged: %#v", cfg.SimpleEnglish)
+	}
+}
+
+func TestLoadSemanticTimeout(t *testing.T) {
+	for _, test := range []struct {
+		name, configured, override, want string
+	}{
+		{"explicit limit", "20s", "", "20s"},
+		{"environment override", "20s", "120s", "120s"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Setenv("PROSECHECK_TIMEOUT", test.override)
+			path := filepath.Join(t.TempDir(), "config.json")
+			if err := os.WriteFile(path, []byte(`{"semantic":{"timeout":"`+test.configured+`"}}`), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			cfg, _, err := Load(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if cfg.Semantic.Timeout != test.want {
+				t.Fatalf("expected timeout %q, got %q", test.want, cfg.Semantic.Timeout)
+			}
+		})
+	}
+}
+
+func TestValidateSemanticTimeout(t *testing.T) {
+	for _, value := range []string{"0s", "-1s", "invalid"} {
+		t.Run(value, func(t *testing.T) {
+			cfg := Default()
+			cfg.Semantic.Timeout = value
+			if err := cfg.Validate(); err == nil {
+				t.Fatal("expected an invalid timeout to fail")
+			}
+		})
 	}
 }
 

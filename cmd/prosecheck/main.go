@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"strings"
 	"time"
@@ -167,6 +168,7 @@ func runCheck(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			})
 			findings, reviewErr := client.Review(ctx, message, diff)
 			if reviewErr != nil {
+				reviewErr = explainReviewError(reviewErr, timeout)
 				if *semanticMode == "on" {
 					fmt.Fprintf(stderr, "The semantic review failed: %v\n", reviewErr)
 					return 2
@@ -175,7 +177,7 @@ func runCheck(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 					Code:       "PC901",
 					Severity:   checker.SeverityInfo,
 					Source:     checker.SourceSystem,
-					Message:    "The semantic review did not run.",
+					Message:    "The semantic review did not finish.",
 					Suggestion: reviewErr.Error(),
 				})
 			} else {
@@ -187,6 +189,14 @@ func runCheck(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 
 	checker.SortFindings(report.Findings)
 	return writeReport(stdout, stderr, report, *format, *strict)
+}
+
+func explainReviewError(err error, timeout time.Duration) error {
+	var networkError net.Error
+	if errors.Is(err, context.DeadlineExceeded) || (errors.As(err, &networkError) && networkError.Timeout()) {
+		return fmt.Errorf("the semantic review timed out (limit %s). Increase semantic.timeout in .prosecheck.json or set PROSECHECK_TIMEOUT (for example, 120s). Large diffs and a busy model can need more time: %w", timeout, err)
+	}
+	return err
 }
 
 func writeReport(stdout, stderr io.Writer, report checker.Report, format string, strict bool) int {
@@ -416,10 +426,10 @@ func runModelDoctor(manager *modelruntime.Manager, args []string, stdout, stderr
 		fmt.Fprintf(stderr, "The model is not ready: %v\n", err)
 		return 2
 	}
-	reviewContext, cancelReview := context.WithTimeout(context.Background(), 30*time.Second)
+	reviewContext, cancelReview := context.WithTimeout(context.Background(), config.DefaultSemanticTimeout)
 	defer cancelReview()
 	client := semantic.NewClient(semantic.Options{
-		Endpoint: state.Endpoint, Model: state.Model, Timeout: 30 * time.Second,
+		Endpoint: state.Endpoint, Model: state.Model, Timeout: config.DefaultSemanticTimeout,
 	})
 	_, err = client.Review(reviewContext,
 		"Prevent duplicate invoice delivery\n\nReject a repeated delivery before the queue accepts it.", "")

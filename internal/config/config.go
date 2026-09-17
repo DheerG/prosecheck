@@ -13,6 +13,8 @@ import (
 
 const FileName = ".prosecheck.json"
 
+const DefaultSemanticTimeout = 60 * time.Second
+
 type Config struct {
 	Subject       SubjectConfig       `json:"subject"`
 	Body          BodyConfig          `json:"body"`
@@ -96,7 +98,7 @@ func Default() Config {
 		},
 		Semantic: SemanticConfig{
 			Runtime: "managed", Model: "ministral-3-8b",
-			Timeout: "20s", MaxDiffBytes: 12000,
+			Timeout: DefaultSemanticTimeout.String(), MaxDiffBytes: 12000,
 		},
 	}
 }
@@ -146,8 +148,12 @@ func (c Config) Validate() error {
 	default:
 		return errors.New("semantic.runtime must be managed or external")
 	}
-	if _, err := time.ParseDuration(c.Semantic.Timeout); err != nil {
+	timeout, err := time.ParseDuration(c.Semantic.Timeout)
+	if err != nil {
 		return fmt.Errorf("semantic.timeout: %w", err)
+	}
+	if timeout <= 0 {
+		return errors.New("semantic.timeout must be more than zero")
 	}
 	if c.Semantic.MaxDiffBytes < 0 {
 		return errors.New("semantic.maxDiffBytes cannot be less than zero")
@@ -217,6 +223,9 @@ func fileExists(path string) bool {
 }
 
 func applyEnvironment(cfg *Config) {
+	if value := os.Getenv("PROSECHECK_TIMEOUT"); value != "" {
+		cfg.Semantic.Timeout = value
+	}
 	if value := os.Getenv("PROSECHECK_ENDPOINT"); value != "" {
 		cfg.Semantic.Endpoint = value
 		cfg.Semantic.Runtime = "external"
