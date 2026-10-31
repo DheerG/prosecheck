@@ -212,3 +212,9 @@ go install github.com/DheerG/prosecheck/cmd/prosecheck@latest
 The project uses only the Go standard library. Tests do not require a model download.
 
 Maintainers can read [Create a release](docs/releases.md) for the tag and package process.
+
+## License
+
+prosecheck uses the [MIT License](LICENSE).
+
+The MIT License also applies to all earlier versions of prosecheck. This includes release v0.1.0 and all commits from before the license file was added.

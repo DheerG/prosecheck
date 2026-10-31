@@ -49,12 +49,13 @@ build_archive() {
 			./cmd/prosecheck
 	)
 	cp "${repository_root}/README.md" "${stage_directory}/README.md"
+	cp "${repository_root}/LICENSE" "${stage_directory}/LICENSE"
 
 	if [ "$operating_system" = windows ]; then
-		(cd "$stage_directory" && zip -q "${distribution_directory}/${archive}" "$executable" README.md)
+		(cd "$stage_directory" && zip -q "${distribution_directory}/${archive}" "$executable" README.md LICENSE)
 	else
 		chmod 0755 "${stage_directory}/${executable}"
-		tar -C "$stage_directory" -czf "${distribution_directory}/${archive}" "$executable" README.md
+		tar -C "$stage_directory" -czf "${distribution_directory}/${archive}" "$executable" README.md LICENSE
 	fi
 }
 
